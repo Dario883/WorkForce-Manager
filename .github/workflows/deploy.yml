@@ -30,7 +30,7 @@
 #    These never touch this file — Azure holds them securely.
 #
 # 5. Azure Web App startup command (set in Configuration → General):
-#      node index.mjs
+#      node dist/index.mjs
 #
 # 6. DB migrations are NOT run automatically.
 #    Run  `pnpm db:push`  locally (or from a protected branch job)
@@ -72,9 +72,7 @@ jobs:
           VITE_AUTH_MODE: ${{ vars.VITE_AUTH_MODE || 'local' }}
 
       - name: Create deploy zip
-        run: |
-          cd dist
-          zip -r ../deploy.zip .
+        run: zip -r deploy.zip dist package.json
 
       - name: Deploy to Azure Web App
         env:
@@ -85,8 +83,35 @@ jobs:
             throw "AZURE_WEBAPP_SCM_URI is empty"
           }
           $response = Invoke-WebRequest `
-            -Uri "$env:AZURE_WEBAPP_SCM_URI/api/zipdeploy?isAsync=false" `
+            -Uri "$env:AZURE_WEBAPP_SCM_URI/api/zipdeploy?isAsync=true" `
             -Method Post `
             -InFile "deploy.zip" `
-            -ContentType "application/zip"
-          Write-Host "zipdeploy-status=$($response.StatusCode)"
+            -ContentType "application/zip" `
+            -UseBasicParsing
+
+          Write-Host "zipdeploy-request-status=$($response.StatusCode)"
+
+          # Poll Kudu deployment status so the workflow fails if deployment actually fails.
+          $maxAttempts = 60
+          $delaySeconds = 5
+          for ($i = 1; $i -le $maxAttempts; $i++) {
+            $latest = Invoke-RestMethod -Uri "$env:AZURE_WEBAPP_SCM_URI/api/deployments/latest" -Method Get -UseBasicParsing
+            $status = [int]$latest.status
+            $progress = "$($latest.progress)"
+            Write-Host "deploy-check attempt=$i status=$status progress=$progress"
+
+            if ($status -eq 4) {
+              Write-Host "Deployment succeeded."
+              break
+            }
+            if ($status -eq 3) {
+              throw "Deployment failed in Kudu. progress=$progress"
+            }
+
+            Start-Sleep -Seconds $delaySeconds
+          }
+
+          $final = Invoke-RestMethod -Uri "$env:AZURE_WEBAPP_SCM_URI/api/deployments/latest" -Method Get -UseBasicParsing
+          if ([int]$final.status -ne 4) {
+            throw "Deployment did not reach success status. finalStatus=$($final.status) progress=$($final.progress)"
+          }
