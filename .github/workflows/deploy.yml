@@ -71,11 +71,8 @@ jobs:
         env:
           VITE_AUTH_MODE: ${{ vars.VITE_AUTH_MODE || 'local' }}
 
-      - name: Prune dev dependencies
-        run: pnpm install --prod --ignore-scripts
-
       - name: Create deploy zip
-        run: zip -r deploy.zip dist package.json node_modules
+        run: zip -r deploy.zip dist
 
       - name: Deploy to Azure Web App
         env:
