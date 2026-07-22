@@ -72,7 +72,7 @@ jobs:
           VITE_AUTH_MODE: ${{ vars.VITE_AUTH_MODE || 'local' }}
 
       - name: Create deploy zip
-        run: zip -r deploy.zip dist
+        run: zip -r deploy.zip dist package.json
 
       - name: Deploy to Azure Web App
         env:
