@@ -265,6 +265,7 @@ Run-OrFail { & $GhExe variable set VITE_AUTH_MODE --body "local" --repo $ghRepo 
 Write-Ok "GitHub CI/CD variables configured"
 
 Write-Step "Applying database schema migrations"
+$skipDbPush = $false
 if (Get-Command pnpm -ErrorAction SilentlyContinue) {
     $env:DATABASE_URL = $databaseUrl
 
@@ -274,21 +275,21 @@ if (Get-Command pnpm -ErrorAction SilentlyContinue) {
         if ($LASTEXITCODE -ne 0) {
             Write-Warn "pnpm install failed. Skipping db:push for now."
             $env:DATABASE_URL = ""
-            goto SkipDbPush
+            $skipDbPush = $true
         }
     }
 
-    pnpm db:push
-    if ($LASTEXITCODE -eq 0) {
-        Write-Ok "Database migrations applied"
-    } else {
-        Write-Warn "pnpm db:push failed. You can rerun it later with DATABASE_URL already printed below."
+    if (-not $skipDbPush) {
+        pnpm db:push
+        if ($LASTEXITCODE -eq 0) {
+            Write-Ok "Database migrations applied"
+        } else {
+            Write-Warn "pnpm db:push failed. You can rerun it later with DATABASE_URL already printed below."
+        }
     }
 } else {
     Write-Warn "pnpm not found. Skipping db migration step."
 }
-
-:SkipDbPush
 
 Write-Host ""
 Write-Host "============================================================" -ForegroundColor Green
