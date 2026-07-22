@@ -149,7 +149,7 @@ Write-Ok "App Service plan ready"
 
 Write-Step "Creating Web App (Node 22 LTS)"
 Run-OrFail { & $AzExe webapp create --name $appName --resource-group $resourceGroup --plan $planName --runtime "NODE:22-lts" --output none } "Failed creating Web App"
-Run-OrFail { & $AzExe webapp config set --name $appName --resource-group $resourceGroup --startup-file "node dist/index.js" --output none } "Failed setting startup command"
+Run-OrFail { & $AzExe webapp config set --name $appName --resource-group $resourceGroup --startup-file "node index.mjs" --output none } "Failed setting startup command"
 Write-Ok "Web App ready"
 
 Write-Step "Creating Azure MySQL Flexible Server"
