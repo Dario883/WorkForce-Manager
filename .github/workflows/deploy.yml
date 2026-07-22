@@ -5,13 +5,12 @@
 # SETUP (once, per environment — yours or the director's):
 #
 # 1. Create an Azure Web App:
-#    - Runtime: Node 20 LTS  |  OS: Linux
+#    - Runtime: Node 22 LTS  |  OS: Linux
 #    - Any name/resource-group you like
 #
 # 2. In your GitHub repo → Settings → Secrets and variables → Actions:
-#    Add these repository secrets from Azure publishing credentials:
-#      AZURE_WEBAPP_PUBLISH_USER
-#      AZURE_WEBAPP_PUBLISH_PASSWORD
+#    Add this repository secret from Azure "Get publish profile":
+#      AZURE_WEBAPP_PUBLISH_PROFILE
 #
 # 3. Add the following REPOSITORY VARIABLES (not secrets):
 #      AZURE_WEBAPP_NAME   → the name of your Azure Web App
@@ -75,95 +74,8 @@ jobs:
         run: zip -r deploy.zip dist package.json
 
       - name: Deploy to Azure Web App
-        env:
-          AZURE_WEBAPP_SCM_URI: ${{ secrets.AZURE_WEBAPP_SCM_URI }}
-        shell: pwsh
-        run: |
-          if (-not $env:AZURE_WEBAPP_SCM_URI) {
-            throw "AZURE_WEBAPP_SCM_URI is empty"
-          }
-
-          $scmUri = [uri]$env:AZURE_WEBAPP_SCM_URI.TrimEnd('/')
-          if (-not $scmUri.UserInfo) {
-            throw "AZURE_WEBAPP_SCM_URI must include publishing credentials (userinfo)."
-          }
-
-          $authenticatedBase = $scmUri.AbsoluteUri.TrimEnd('/')
-          $publicBase = "$($scmUri.Scheme)://$($scmUri.Host)"
-
-          $response = Invoke-WebRequest `
-            -Uri "$authenticatedBase/api/zipdeploy?isAsync=true" `
-            -Method Post `
-            -InFile "deploy.zip" `
-            -ContentType "application/zip" `
-            -UseBasicParsing
-
-          Write-Host "zipdeploy-request-status=$($response.StatusCode)"
-
-          # Prefer the deployment-specific URL returned by Kudu.
-          $deploymentUrl = $response.Headers.Location
-          if (-not $deploymentUrl) {
-            $deploymentUrl = "$authenticatedBase/api/deployments/latest"
-          } elseif ($deploymentUrl.StartsWith('/')) {
-            $deploymentUrl = "$authenticatedBase$deploymentUrl"
-          } elseif ($deploymentUrl.StartsWith($publicBase)) {
-            $deploymentPath = $deploymentUrl.Substring($publicBase.Length)
-            $deploymentUrl = "$authenticatedBase$deploymentPath"
-          }
-          Write-Host "deployment-url=$deploymentUrl"
-
-          # Poll Kudu deployment status so the workflow fails if deployment actually fails.
-          $maxAttempts = 60
-          $delaySeconds = 5
-          for ($i = 1; $i -le $maxAttempts; $i++) {
-            $latestRaw = Invoke-WebRequest -Uri $deploymentUrl -Method Get -UseBasicParsing
-            $content = $latestRaw.Content
-            if (-not $content) {
-              Write-Host "deploy-check attempt=$i status=unknown progress=empty-response"
-              Start-Sleep -Seconds $delaySeconds
-              continue
-            }
-
-            if ($content -match '<!DOCTYPE html>|<html') {
-              throw "Kudu returned HTML instead of deployment JSON. Check AZURE_WEBAPP_SCM_URI secret."
-            }
-
-            $latest = $content | ConvertFrom-Json
-            if ($latest -is [array]) {
-              if ($latest.Count -eq 0) {
-                Write-Host "deploy-check attempt=$i status=unknown progress=empty-array"
-                Start-Sleep -Seconds $delaySeconds
-                continue
-              }
-              $latest = $latest[0]
-            }
-
-            $status = $latest.status
-            $progress = "$($latest.progress)"
-            Write-Host "deploy-check attempt=$i status=$status progress=$progress"
-
-            if ($status -eq 4) {
-              Write-Host "Deployment succeeded."
-              break
-            }
-            if ($status -eq 3) {
-              throw "Deployment failed in Kudu. progress=$progress"
-            }
-
-            Start-Sleep -Seconds $delaySeconds
-          }
-
-          $finalContent = (Invoke-WebRequest -Uri $deploymentUrl -Method Get -UseBasicParsing).Content
-          if (-not $finalContent) {
-            throw "Deployment status response was empty at final check."
-          }
-          $final = $finalContent | ConvertFrom-Json
-          if ($final -is [array]) {
-            if ($final.Count -eq 0) {
-              throw "Deployment status response array was empty at final check."
-            }
-            $final = $final[0]
-          }
-          if ($final.status -ne 4) {
-            throw "Deployment did not reach success status. finalStatus=$($final.status) progress=$($final.progress)"
-          }
+        uses: azure/webapps-deploy@v3
+        with:
+          app-name: ${{ vars.AZURE_WEBAPP_NAME }}
+          publish-profile: ${{ secrets.AZURE_WEBAPP_PUBLISH_PROFILE }}
+          package: deploy.zip
