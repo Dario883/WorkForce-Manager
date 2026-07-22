@@ -82,8 +82,10 @@ jobs:
           if (-not $env:AZURE_WEBAPP_SCM_URI) {
             throw "AZURE_WEBAPP_SCM_URI is empty"
           }
+
+          $baseUri = $env:AZURE_WEBAPP_SCM_URI.TrimEnd('/')
           $response = Invoke-WebRequest `
-            -Uri "$env:AZURE_WEBAPP_SCM_URI/api/zipdeploy?isAsync=true" `
+            -Uri "$baseUri/api/zipdeploy?isAsync=true" `
             -Method Post `
             -InFile "deploy.zip" `
             -ContentType "application/zip" `
@@ -91,12 +93,42 @@ jobs:
 
           Write-Host "zipdeploy-request-status=$($response.StatusCode)"
 
+          # Prefer the deployment-specific URL returned by Kudu.
+          $deploymentUrl = $response.Headers.Location
+          if (-not $deploymentUrl) {
+            $deploymentUrl = "$baseUri/api/deployments/latest"
+          } elseif ($deploymentUrl.StartsWith('/')) {
+            $deploymentUrl = "$baseUri$deploymentUrl"
+          }
+          Write-Host "deployment-url=$deploymentUrl"
+
           # Poll Kudu deployment status so the workflow fails if deployment actually fails.
           $maxAttempts = 60
           $delaySeconds = 5
           for ($i = 1; $i -le $maxAttempts; $i++) {
-            $latest = Invoke-RestMethod -Uri "$env:AZURE_WEBAPP_SCM_URI/api/deployments/latest" -Method Get -UseBasicParsing
-            $status = [int]$latest.status
+            $latestRaw = Invoke-WebRequest -Uri $deploymentUrl -Method Get -UseBasicParsing
+            $content = $latestRaw.Content
+            if (-not $content) {
+              Write-Host "deploy-check attempt=$i status=unknown progress=empty-response"
+              Start-Sleep -Seconds $delaySeconds
+              continue
+            }
+
+            if ($content -match '<!DOCTYPE html>|<html') {
+              throw "Kudu returned HTML instead of deployment JSON. Check AZURE_WEBAPP_SCM_URI secret."
+            }
+
+            $latest = $content | ConvertFrom-Json
+            if ($latest -is [array]) {
+              if ($latest.Count -eq 0) {
+                Write-Host "deploy-check attempt=$i status=unknown progress=empty-array"
+                Start-Sleep -Seconds $delaySeconds
+                continue
+              }
+              $latest = $latest[0]
+            }
+
+            $status = $latest.status
             $progress = "$($latest.progress)"
             Write-Host "deploy-check attempt=$i status=$status progress=$progress"
 
@@ -111,7 +143,17 @@ jobs:
             Start-Sleep -Seconds $delaySeconds
           }
 
-          $final = Invoke-RestMethod -Uri "$env:AZURE_WEBAPP_SCM_URI/api/deployments/latest" -Method Get -UseBasicParsing
-          if ([int]$final.status -ne 4) {
+          $finalContent = (Invoke-WebRequest -Uri $deploymentUrl -Method Get -UseBasicParsing).Content
+          if (-not $finalContent) {
+            throw "Deployment status response was empty at final check."
+          }
+          $final = $finalContent | ConvertFrom-Json
+          if ($final -is [array]) {
+            if ($final.Count -eq 0) {
+              throw "Deployment status response array was empty at final check."
+            }
+            $final = $final[0]
+          }
+          if ($final.status -ne 4) {
             throw "Deployment did not reach success status. finalStatus=$($final.status) progress=$($final.progress)"
           }
