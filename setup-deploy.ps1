@@ -246,6 +246,17 @@ if ($LASTEXITCODE -ne 0 -or -not $publishProfile) {
 $publishProfile | & $GhExe secret set AZURE_WEBAPP_PUBLISH_PROFILE --repo $ghRepo
 if ($LASTEXITCODE -ne 0) { throw "Failed setting GitHub secret AZURE_WEBAPP_PUBLISH_PROFILE" }
 
+$publishingCredentials = & $AzExe webapp deployment list-publishing-credentials --name $appName --resource-group $resourceGroup -o json | ConvertFrom-Json
+if (-not $publishingCredentials -or -not $publishingCredentials.publishingUserName -or -not $publishingCredentials.publishingPassword) {
+    throw "Failed fetching publishing credentials"
+}
+
+$publishingCredentials.publishingUserName | & $GhExe secret set AZURE_WEBAPP_PUBLISH_USER --repo $ghRepo
+if ($LASTEXITCODE -ne 0) { throw "Failed setting GitHub secret AZURE_WEBAPP_PUBLISH_USER" }
+
+$publishingCredentials.publishingPassword | & $GhExe secret set AZURE_WEBAPP_PUBLISH_PASSWORD --repo $ghRepo
+if ($LASTEXITCODE -ne 0) { throw "Failed setting GitHub secret AZURE_WEBAPP_PUBLISH_PASSWORD" }
+
 Run-OrFail { & $GhExe variable set AZURE_WEBAPP_NAME --body $appName --repo $ghRepo } "Failed setting GitHub variable AZURE_WEBAPP_NAME"
 Run-OrFail { & $GhExe variable set VITE_AUTH_MODE --body "local" --repo $ghRepo } "Failed setting GitHub variable VITE_AUTH_MODE"
 Write-Ok "GitHub CI/CD variables configured"

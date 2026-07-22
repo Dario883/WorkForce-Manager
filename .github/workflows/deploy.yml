@@ -8,13 +8,12 @@
 #    - Runtime: Node 20 LTS  |  OS: Linux
 #    - Any name/resource-group you like
 #
-# 2. In the Azure Portal, open the Web App →
-#    "Deployment Center" → "Manage publish profile" → Download.
-#    Paste the whole XML content as a GitHub secret named:
-#      AZURE_WEBAPP_PUBLISH_PROFILE
+# 2. In your GitHub repo → Settings → Secrets and variables → Actions:
+#    Add these repository secrets from Azure publishing credentials:
+#      AZURE_WEBAPP_PUBLISH_USER
+#      AZURE_WEBAPP_PUBLISH_PASSWORD
 #
-# 3. In your GitHub repo → Settings → Secrets and variables → Actions:
-#    Add the following REPOSITORY VARIABLES (not secrets):
+# 3. Add the following REPOSITORY VARIABLES (not secrets):
 #      AZURE_WEBAPP_NAME   → the name of your Azure Web App
 #
 # 4. In the Azure Portal, open the Web App →
@@ -75,9 +74,13 @@ jobs:
       - name: Prune dev dependencies
         run: pnpm install --prod --ignore-scripts
 
+      - name: Create deploy zip
+        run: zip -r deploy.zip dist package.json node_modules
+
       - name: Deploy to Azure Web App
-        uses: azure/webapps-deploy@v3
-        with:
-          app-name: ${{ vars.AZURE_WEBAPP_NAME }}
-          publish-profile: ${{ secrets.AZURE_WEBAPP_PUBLISH_PROFILE }}
-          package: .
+        run: |
+          curl --fail-with-body \
+            -u "${{ secrets.AZURE_WEBAPP_PUBLISH_USER }}:${{ secrets.AZURE_WEBAPP_PUBLISH_PASSWORD }}" \
+            -X POST \
+            --data-binary @deploy.zip \
+            "https://${{ vars.AZURE_WEBAPP_NAME }}.scm.azurewebsites.net/api/zipdeploy?isAsync=false"
