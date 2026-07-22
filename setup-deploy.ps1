@@ -239,6 +239,16 @@ Run-OrFail { & $AzExe webapp config appsettings set --name $appName --resource-g
 Write-Ok "App settings applied"
 
 Write-Step "Configuring GitHub secret and variables"
+$subscriptionId = & $AzExe account show --query id --output tsv
+if ($LASTEXITCODE -ne 0 -or -not $subscriptionId) {
+    throw "Failed getting Azure subscription ID"
+}
+
+$scmPolicyId = "/subscriptions/$subscriptionId/resourceGroups/$resourceGroup/providers/Microsoft.Web/sites/$appName/basicPublishingCredentialsPolicies/scm"
+Run-OrFail {
+    & $AzExe resource update --ids $scmPolicyId --api-version "2022-03-01" --set properties.allow=true --output none
+} "Failed enabling SCM publishing credentials"
+
 $publishProfile = & $AzExe webapp deployment list-publishing-profiles --name $appName --resource-group $resourceGroup --xml
 if ($LASTEXITCODE -ne 0 -or -not $publishProfile) {
     throw "Failed fetching publish profile"
