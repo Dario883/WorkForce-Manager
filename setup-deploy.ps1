@@ -251,10 +251,10 @@ if (-not $publishingCredentials -or -not $publishingCredentials.publishingUserNa
     throw "Failed fetching publishing credentials"
 }
 
-$publishingCredentials.publishingUserName | & $GhExe secret set AZURE_WEBAPP_PUBLISH_USER --repo $ghRepo
+$null = & $GhExe secret set AZURE_WEBAPP_PUBLISH_USER --repo $ghRepo --body "$($publishingCredentials.publishingUserName)"
 if ($LASTEXITCODE -ne 0) { throw "Failed setting GitHub secret AZURE_WEBAPP_PUBLISH_USER" }
 
-$publishingCredentials.publishingPassword | & $GhExe secret set AZURE_WEBAPP_PUBLISH_PASSWORD --repo $ghRepo
+$null = & $GhExe secret set AZURE_WEBAPP_PUBLISH_PASSWORD --repo $ghRepo --body "$($publishingCredentials.publishingPassword)"
 if ($LASTEXITCODE -ne 0) { throw "Failed setting GitHub secret AZURE_WEBAPP_PUBLISH_PASSWORD" }
 
 Run-OrFail { & $GhExe variable set AZURE_WEBAPP_NAME --body $appName --repo $ghRepo } "Failed setting GitHub variable AZURE_WEBAPP_NAME"
