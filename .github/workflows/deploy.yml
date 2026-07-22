@@ -80,10 +80,14 @@ jobs:
       - name: Deploy to Azure Web App
         env:
           AZURE_WEBAPP_SCM_URI: ${{ secrets.AZURE_WEBAPP_SCM_URI }}
+        shell: pwsh
         run: |
-          test -n "$AZURE_WEBAPP_SCM_URI"
-          curl --fail-with-body \
-            -H "Content-Type: application/zip" \
-            -X POST \
-            --data-binary @deploy.zip \
-            "$AZURE_WEBAPP_SCM_URI/api/zipdeploy?isAsync=false"
+          if (-not $env:AZURE_WEBAPP_SCM_URI) {
+            throw "AZURE_WEBAPP_SCM_URI is empty"
+          }
+          $response = Invoke-WebRequest `
+            -Uri "$env:AZURE_WEBAPP_SCM_URI/api/zipdeploy?isAsync=false" `
+            -Method Post `
+            -InFile "deploy.zip" `
+            -ContentType "application/zip"
+          Write-Host "zipdeploy-status=$($response.StatusCode)"
