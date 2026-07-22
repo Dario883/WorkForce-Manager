@@ -83,23 +83,19 @@ jobs:
             throw "AZURE_WEBAPP_SCM_URI is empty"
           }
 
-          $scmUri = [uri]$env:AZURE_WEBAPP_SCM_URI
+          $scmUri = [uri]$env:AZURE_WEBAPP_SCM_URI.TrimEnd('/')
           if (-not $scmUri.UserInfo) {
             throw "AZURE_WEBAPP_SCM_URI must include publishing credentials (userinfo)."
           }
 
-          $apiBase = "$($scmUri.Scheme)://$($scmUri.Host)"
-          $authPair = [System.Uri]::UnescapeDataString($scmUri.UserInfo)
-          $authBytes = [System.Text.Encoding]::ASCII.GetBytes($authPair)
-          $authHeader = "Basic " + [System.Convert]::ToBase64String($authBytes)
-          $headers = @{ Authorization = $authHeader }
+          $authenticatedBase = $scmUri.AbsoluteUri.TrimEnd('/')
+          $publicBase = "$($scmUri.Scheme)://$($scmUri.Host)"
 
           $response = Invoke-WebRequest `
-            -Uri "$apiBase/api/zipdeploy?isAsync=true" `
+            -Uri "$authenticatedBase/api/zipdeploy?isAsync=true" `
             -Method Post `
             -InFile "deploy.zip" `
             -ContentType "application/zip" `
-            -Headers $headers `
             -UseBasicParsing
 
           Write-Host "zipdeploy-request-status=$($response.StatusCode)"
@@ -107,9 +103,12 @@ jobs:
           # Prefer the deployment-specific URL returned by Kudu.
           $deploymentUrl = $response.Headers.Location
           if (-not $deploymentUrl) {
-            $deploymentUrl = "$apiBase/api/deployments/latest"
+            $deploymentUrl = "$authenticatedBase/api/deployments/latest"
           } elseif ($deploymentUrl.StartsWith('/')) {
-            $deploymentUrl = "$apiBase$deploymentUrl"
+            $deploymentUrl = "$authenticatedBase$deploymentUrl"
+          } elseif ($deploymentUrl.StartsWith($publicBase)) {
+            $deploymentPath = $deploymentUrl.Substring($publicBase.Length)
+            $deploymentUrl = "$authenticatedBase$deploymentPath"
           }
           Write-Host "deployment-url=$deploymentUrl"
 
@@ -117,7 +116,7 @@ jobs:
           $maxAttempts = 60
           $delaySeconds = 5
           for ($i = 1; $i -le $maxAttempts; $i++) {
-            $latestRaw = Invoke-WebRequest -Uri $deploymentUrl -Method Get -Headers $headers -UseBasicParsing
+            $latestRaw = Invoke-WebRequest -Uri $deploymentUrl -Method Get -UseBasicParsing
             $content = $latestRaw.Content
             if (-not $content) {
               Write-Host "deploy-check attempt=$i status=unknown progress=empty-response"
@@ -154,7 +153,7 @@ jobs:
             Start-Sleep -Seconds $delaySeconds
           }
 
-          $finalContent = (Invoke-WebRequest -Uri $deploymentUrl -Method Get -Headers $headers -UseBasicParsing).Content
+          $finalContent = (Invoke-WebRequest -Uri $deploymentUrl -Method Get -UseBasicParsing).Content
           if (-not $finalContent) {
             throw "Deployment status response was empty at final check."
           }
