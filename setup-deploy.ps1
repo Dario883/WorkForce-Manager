@@ -247,7 +247,7 @@ $publishProfile | & $GhExe secret set AZURE_WEBAPP_PUBLISH_PROFILE --repo $ghRep
 if ($LASTEXITCODE -ne 0) { throw "Failed setting GitHub secret AZURE_WEBAPP_PUBLISH_PROFILE" }
 
 $publishingCredentials = & $AzExe webapp deployment list-publishing-credentials --name $appName --resource-group $resourceGroup -o json | ConvertFrom-Json
-if (-not $publishingCredentials -or -not $publishingCredentials.publishingUserName -or -not $publishingCredentials.publishingPassword) {
+if (-not $publishingCredentials -or -not $publishingCredentials.publishingUserName -or -not $publishingCredentials.publishingPassword -or -not $publishingCredentials.scmUri) {
     throw "Failed fetching publishing credentials"
 }
 
@@ -256,6 +256,9 @@ if ($LASTEXITCODE -ne 0) { throw "Failed setting GitHub secret AZURE_WEBAPP_PUBL
 
 $null = & $GhExe secret set AZURE_WEBAPP_PUBLISH_PASSWORD --repo $ghRepo --body "$($publishingCredentials.publishingPassword)"
 if ($LASTEXITCODE -ne 0) { throw "Failed setting GitHub secret AZURE_WEBAPP_PUBLISH_PASSWORD" }
+
+$null = & $GhExe secret set AZURE_WEBAPP_SCM_URI --repo $ghRepo --body "$($publishingCredentials.scmUri)"
+if ($LASTEXITCODE -ne 0) { throw "Failed setting GitHub secret AZURE_WEBAPP_SCM_URI" }
 
 Run-OrFail { & $GhExe variable set AZURE_WEBAPP_NAME --body $appName --repo $ghRepo } "Failed setting GitHub variable AZURE_WEBAPP_NAME"
 Run-OrFail { & $GhExe variable set VITE_AUTH_MODE --body "local" --repo $ghRepo } "Failed setting GitHub variable VITE_AUTH_MODE"

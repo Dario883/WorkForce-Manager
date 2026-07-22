@@ -79,13 +79,11 @@ jobs:
 
       - name: Deploy to Azure Web App
         env:
-          AZURE_WEBAPP_PUBLISH_USER: ${{ secrets.AZURE_WEBAPP_PUBLISH_USER }}
-          AZURE_WEBAPP_PUBLISH_PASSWORD: ${{ secrets.AZURE_WEBAPP_PUBLISH_PASSWORD }}
-          AZURE_WEBAPP_NAME: ${{ vars.AZURE_WEBAPP_NAME }}
+          AZURE_WEBAPP_SCM_URI: ${{ secrets.AZURE_WEBAPP_SCM_URI }}
         run: |
-          AUTH_HEADER=$(printf '%s' "$AZURE_WEBAPP_PUBLISH_USER:$AZURE_WEBAPP_PUBLISH_PASSWORD" | base64)
+          test -n "$AZURE_WEBAPP_SCM_URI"
           curl --fail-with-body \
-            -H "Authorization: Basic $AUTH_HEADER" \
+            -H "Content-Type: application/zip" \
             -X POST \
             --data-binary @deploy.zip \
-            "https://$AZURE_WEBAPP_NAME.scm.azurewebsites.net/api/zipdeploy?isAsync=false"
+            "$AZURE_WEBAPP_SCM_URI/api/zipdeploy?isAsync=false"
