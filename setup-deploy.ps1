@@ -1,6 +1,6 @@
 # =============================================================
-# WorkForce Manager - Full Azure + GitHub setup (minimal input)
-# Only interactive steps: Azure login + GitHub login
+# WorkForce Manager - Azure App Service + PostgreSQL setup
+# Interactive steps: Azure login + GitHub login (optional)
 # =============================================================
 
 Set-StrictMode -Version Latest
@@ -16,6 +16,20 @@ function Run-OrFail {
     if ($LASTEXITCODE -ne 0) {
         throw $FailureMessage
     }
+}
+
+function Ensure-AzProviderRegistered {
+    param([string]$Namespace)
+
+    $state = & $AzExe provider show --namespace $Namespace --query registrationState --output tsv 2>$null
+    if ($LASTEXITCODE -eq 0 -and $state -eq "Registered") {
+        Write-Ok "Azure provider $Namespace already registered"
+        return
+    }
+
+    Write-Warn "Registering Azure provider $Namespace..."
+    Run-OrFail { & $AzExe provider register --namespace $Namespace --wait --output none } "Failed registering provider $Namespace"
+    Write-Ok "Azure provider $Namespace registered"
 }
 
 function Install-IfMissing {
@@ -38,8 +52,6 @@ function Install-IfMissing {
     $userPath = [System.Environment]::GetEnvironmentVariable("PATH", "User")
     $env:PATH = "$machinePath;$userPath"
 
-    # Azure CLI on Windows is often installed here, but not immediately visible
-    # in current PATH until shell restart.
     if ($cmd -eq "az") {
         $azKnownPath = "C:\Program Files\Microsoft SDKs\Azure\CLI2\wbin"
         if ((Test-Path $azKnownPath) -and ($env:PATH -notlike "*$azKnownPath*")) {
@@ -111,12 +123,9 @@ if ($LASTEXITCODE -ne 0) {
 }
 Write-Ok "Azure authenticated"
 
-Write-Step "GitHub login"
-& $GhExe auth status 2>$null
-if ($LASTEXITCODE -ne 0) {
-    Run-OrFail { & $GhExe auth login --hostname github.com --web } "GitHub login failed"
-}
-Write-Ok "GitHub authenticated"
+Write-Step "Checking Azure provider registrations"
+Ensure-AzProviderRegistered "Microsoft.Web"
+Ensure-AzProviderRegistered "Microsoft.DBforPostgreSQL"
 
 Write-Step "Deriving resource names"
 $repoName = ($ghRepo -split "/")[-1]
@@ -124,20 +133,20 @@ $safeBase = To-SafeName $repoName
 $suffix = -join ((97..122) + (48..57) | Get-Random -Count 6 | ForEach-Object {[char]$_})
 
 $preferredLocation = "westeurope"
-$mysqlCandidateLocations = @("westeurope", "northeurope", "swedencentral", "francecentral", "italynorth")
+$pgCandidateLocations = @("westeurope", "northeurope", "swedencentral", "francecentral", "italynorth")
 $location = $preferredLocation
 $resourceGroup = "$safeBase-rg"
 $appName = ("$safeBase-$suffix").Substring(0, [Math]::Min(("$safeBase-$suffix").Length, 60)).Trim('-')
 $planName = "$safeBase-plan"
-$mysqlServer = ("$safeBase-db-$suffix").Substring(0, [Math]::Min(("$safeBase-db-$suffix").Length, 63)).Trim('-')
-$mysqlDbName = "workforce_manager"
-$mysqlAdminUser = "wfmadmin"
-$mysqlAdminPassword = "Wfm!" + (New-RandomToken 18)
+$pgServer = ("$safeBase-pg-$suffix").Substring(0, [Math]::Min(("$safeBase-pg-$suffix").Length, 63)).Trim('-')
+$pgDbName = "workforce_manager"
+$pgAdminUser = "wfmadmin"
+$pgAdminPassword = "Wfm!" + (New-RandomToken 18)
 $jwtSecret = New-RandomToken 32
 
 Write-Ok "Resource group: $resourceGroup"
 Write-Ok "Web app: $appName"
-Write-Ok "MySQL server: $mysqlServer"
+Write-Ok "PostgreSQL server: $pgServer"
 
 Write-Step "Creating resource group"
 Run-OrFail { & $AzExe group create --name $resourceGroup --location $location --output none } "Failed creating resource group"
@@ -149,52 +158,43 @@ Write-Ok "App Service plan ready"
 
 Write-Step "Creating Web App (Node 22 LTS)"
 Run-OrFail { & $AzExe webapp create --name $appName --resource-group $resourceGroup --plan $planName --runtime "NODE:22-lts" --output none } "Failed creating Web App"
-Run-OrFail { & $AzExe webapp config set --name $appName --resource-group $resourceGroup --startup-file "node dist/index.mjs" --output none } "Failed setting startup command"
+Run-OrFail { & $AzExe webapp config set --name $appName --resource-group $resourceGroup --startup-file "node dist/index.js" --output none } "Failed setting startup command"
 Write-Ok "Web App ready"
 
-Write-Step "Creating Azure MySQL Flexible Server"
-$mysqlCreated = $false
-foreach ($candidateLocation in $mysqlCandidateLocations) {
+Write-Step "Creating Azure PostgreSQL Flexible Server"
+$pgCreated = $false
+foreach ($candidateLocation in $pgCandidateLocations) {
     for ($i = 1; $i -le 3; $i++) {
         $candidateSuffix = -join ((97..122) + (48..57) | Get-Random -Count 4 | ForEach-Object {[char]$_})
-        $candidateServer = ("$safeBase-db-$suffix-$candidateSuffix").Substring(0, [Math]::Min(("$safeBase-db-$suffix-$candidateSuffix").Length, 63)).Trim('-')
-        Write-Warn "Trying MySQL create in $candidateLocation with server $candidateServer (attempt $i/3)"
-                & $AzExe mysql flexible-server create `
+        $candidateServer = ("$safeBase-pg-$suffix-$candidateSuffix").Substring(0, [Math]::Min(("$safeBase-pg-$suffix-$candidateSuffix").Length, 63)).Trim('-')
+        Write-Warn "Trying PostgreSQL create in $candidateLocation with server $candidateServer (attempt $i/3)"
+        & $AzExe postgres flexible-server create `
           --resource-group $resourceGroup `
           --name $candidateServer `
           --location $candidateLocation `
-          --admin-user $mysqlAdminUser `
-          --admin-password $mysqlAdminPassword `
+          --admin-user $pgAdminUser `
+          --admin-password $pgAdminPassword `
           --sku-name Standard_B1ms `
           --tier Burstable `
-          --version 8.0.21 `
+          --version 16 `
           --storage-size 32 `
           --public-access 0.0.0.0 `
+          --yes `
           --output none
         if ($LASTEXITCODE -eq 0) {
-            $mysqlServer = $candidateServer
+            $pgServer = $candidateServer
             $location = $candidateLocation
-            $mysqlCreated = $true
+            $pgCreated = $true
             break
         }
     }
-    if ($mysqlCreated) { break }
+    if ($pgCreated) { break }
 }
 
-if (-not $mysqlCreated) {
-    throw "Failed creating MySQL server in tested regions: $($mysqlCandidateLocations -join ', ')"
+if (-not $pgCreated) {
+    throw "Failed creating PostgreSQL server in tested regions: $($pgCandidateLocations -join ', ')"
 }
-Write-Ok "MySQL server ready in ${location}: $mysqlServer"
-
-Run-OrFail {
-    & $AzExe mysql flexible-server firewall-rule create `
-      --resource-group $resourceGroup `
-      --name $mysqlServer `
-      --rule-name allow-azure-services `
-      --start-ip-address 0.0.0.0 `
-      --end-ip-address 0.0.0.0 `
-      --output none
-} "Failed configuring MySQL firewall for Azure services"
+Write-Ok "PostgreSQL server ready in ${location}: $pgServer"
 
 $publicIp = ""
 try {
@@ -205,10 +205,10 @@ try {
 
 if ($publicIp) {
     Run-OrFail {
-        & $AzExe mysql flexible-server firewall-rule create `
+        & $AzExe postgres flexible-server firewall-rule create `
           --resource-group $resourceGroup `
-          --name $mysqlServer `
-          --rule-name allow-local-setup `
+          --server-name $pgServer `
+          --name allow-local-setup `
           --start-ip-address $publicIp `
           --end-ip-address $publicIp `
           --output none
@@ -216,89 +216,70 @@ if ($publicIp) {
 }
 
 Run-OrFail {
-    & $AzExe mysql flexible-server db create `
+    & $AzExe postgres flexible-server db create `
       --resource-group $resourceGroup `
-      --server-name $mysqlServer `
-      --database-name $mysqlDbName `
+      --server-name $pgServer `
+    --name $pgDbName `
       --output none
-} "Failed creating MySQL database"
+} "Failed creating PostgreSQL database"
 
-$mysqlHost = "$mysqlServer.mysql.database.azure.com"
-$escapedDbPass = [System.Uri]::EscapeDataString($mysqlAdminPassword)
-$databaseUrl = ('mysql://{0}:{1}@{2}:3306/{3}?ssl=%7B%22rejectUnauthorized%22%3Atrue%7D' -f $mysqlAdminUser, $escapedDbPass, $mysqlHost, $mysqlDbName)
-Write-Ok "MySQL database ready"
+$pgHost = "$pgServer.postgres.database.azure.com"
+$escapedUser = [System.Uri]::EscapeDataString($pgAdminUser)
+$escapedPass = [System.Uri]::EscapeDataString($pgAdminPassword)
+$databaseUrl = ('postgresql://{0}:{1}@{2}:5432/{3}?sslmode=require' -f $escapedUser, $escapedPass, $pgHost, $pgDbName)
+Write-Ok "PostgreSQL database ready"
 
 Write-Step "Applying Azure Web App environment variables"
 $appSettings = @(
     "DATABASE_URL=$databaseUrl",
     "JWT_SECRET=$jwtSecret",
-    "APP_AUTH_MODE=local",
     "NODE_ENV=production"
 )
 Run-OrFail { & $AzExe webapp config appsettings set --name $appName --resource-group $resourceGroup --settings $appSettings --output none } "Failed setting app settings"
 Write-Ok "App settings applied"
 
-Write-Step "Configuring GitHub secret and variables"
-$subscriptionId = & $AzExe account show --query id --output tsv
-if ($LASTEXITCODE -ne 0 -or -not $subscriptionId) {
-    throw "Failed getting Azure subscription ID"
-}
-
-$scmPolicyId = "/subscriptions/$subscriptionId/resourceGroups/$resourceGroup/providers/Microsoft.Web/sites/$appName/basicPublishingCredentialsPolicies/scm"
-Run-OrFail {
-    & $AzExe resource update --ids $scmPolicyId --api-version "2022-03-01" --set properties.allow=true --output none
-} "Failed enabling SCM publishing credentials"
-
-$publishProfile = & $AzExe webapp deployment list-publishing-profiles --name $appName --resource-group $resourceGroup --xml
-if ($LASTEXITCODE -ne 0 -or -not $publishProfile) {
-    throw "Failed fetching publish profile"
-}
-$publishProfile | & $GhExe secret set AZURE_WEBAPP_PUBLISH_PROFILE --repo $ghRepo
-if ($LASTEXITCODE -ne 0) { throw "Failed setting GitHub secret AZURE_WEBAPP_PUBLISH_PROFILE" }
-
-$publishingCredentials = & $AzExe webapp deployment list-publishing-credentials --name $appName --resource-group $resourceGroup -o json | ConvertFrom-Json
-if (-not $publishingCredentials -or -not $publishingCredentials.publishingUserName -or -not $publishingCredentials.publishingPassword -or -not $publishingCredentials.scmUri) {
-    throw "Failed fetching publishing credentials"
-}
-
-$null = & $GhExe secret set AZURE_WEBAPP_PUBLISH_USER --repo $ghRepo --body "$($publishingCredentials.publishingUserName)"
-if ($LASTEXITCODE -ne 0) { throw "Failed setting GitHub secret AZURE_WEBAPP_PUBLISH_USER" }
-
-$null = & $GhExe secret set AZURE_WEBAPP_PUBLISH_PASSWORD --repo $ghRepo --body "$($publishingCredentials.publishingPassword)"
-if ($LASTEXITCODE -ne 0) { throw "Failed setting GitHub secret AZURE_WEBAPP_PUBLISH_PASSWORD" }
-
-$null = & $GhExe secret set AZURE_WEBAPP_SCM_URI --repo $ghRepo --body "$($publishingCredentials.scmUri)"
-if ($LASTEXITCODE -ne 0) { throw "Failed setting GitHub secret AZURE_WEBAPP_SCM_URI" }
-
-Run-OrFail { & $GhExe variable set AZURE_WEBAPP_NAME --body $appName --repo $ghRepo } "Failed setting GitHub variable AZURE_WEBAPP_NAME"
-Run-OrFail { & $GhExe variable set VITE_AUTH_MODE --body "local" --repo $ghRepo } "Failed setting GitHub variable VITE_AUTH_MODE"
-Write-Ok "GitHub CI/CD variables configured"
-
-Write-Step "Applying database schema migrations"
-$skipDbPush = $false
-if (Get-Command pnpm -ErrorAction SilentlyContinue) {
-    $env:DATABASE_URL = $databaseUrl
-
-    if (-not (Test-Path "./node_modules/drizzle-kit/bin.cjs")) {
-        Write-Warn "node_modules not ready, running pnpm install first..."
-        pnpm install --frozen-lockfile
+Write-Step "Applying database migrations (npm run db:migrate)"
+$env:DATABASE_URL = $databaseUrl
+if (Get-Command npm -ErrorAction SilentlyContinue) {
+    if (-not (Test-Path "./node_modules")) {
+        npm ci
         if ($LASTEXITCODE -ne 0) {
-            Write-Warn "pnpm install failed. Skipping db:push for now."
+            Write-Warn "npm ci failed. Skipping migration step for now."
             $env:DATABASE_URL = ""
-            $skipDbPush = $true
         }
     }
 
-    if (-not $skipDbPush) {
-        pnpm db:push
+    if ($env:DATABASE_URL) {
+        npm run db:migrate
         if ($LASTEXITCODE -eq 0) {
             Write-Ok "Database migrations applied"
         } else {
-            Write-Warn "pnpm db:push failed. You can rerun it later with DATABASE_URL already printed below."
+            Write-Warn "npm run db:migrate failed. You can rerun manually with DATABASE_URL shown below."
         }
     }
 } else {
-    Write-Warn "pnpm not found. Skipping db migration step."
+    Write-Warn "npm not found. Skipping migration step."
+}
+
+Write-Step "Optional GitHub CI/CD secrets setup"
+if (Test-Path ".github/workflows/deploy.yml") {
+    & $GhExe auth status 2>$null
+    if ($LASTEXITCODE -ne 0) {
+        Run-OrFail { & $GhExe auth login --hostname github.com --web } "GitHub login failed"
+    }
+
+    $publishProfile = & $AzExe webapp deployment list-publishing-profiles --name $appName --resource-group $resourceGroup --xml
+    if ($LASTEXITCODE -ne 0 -or -not $publishProfile) {
+        throw "Failed fetching publish profile"
+    }
+
+    $publishProfile | & $GhExe secret set AZURE_WEBAPP_PUBLISH_PROFILE --repo $ghRepo
+    if ($LASTEXITCODE -ne 0) { throw "Failed setting GitHub secret AZURE_WEBAPP_PUBLISH_PROFILE" }
+
+    Run-OrFail { & $GhExe variable set AZURE_WEBAPP_NAME --body $appName --repo $ghRepo } "Failed setting GitHub variable AZURE_WEBAPP_NAME"
+    Write-Ok "GitHub CI/CD secrets/variables configured"
+} else {
+    Write-Warn "No .github/workflows/deploy.yml found. Skipping GitHub secrets setup."
 }
 
 Write-Host ""
@@ -307,10 +288,10 @@ Write-Host " Setup complete" -ForegroundColor Green
 Write-Host "============================================================" -ForegroundColor Green
 Write-Host " Web App URL: https://$appName.azurewebsites.net" -ForegroundColor Green
 Write-Host " Resource Group: $resourceGroup" -ForegroundColor Green
-Write-Host " MySQL Server: $mysqlServer" -ForegroundColor Green
-Write-Host " MySQL DB: $mysqlDbName" -ForegroundColor Green
-Write-Host " MySQL Admin User: $mysqlAdminUser" -ForegroundColor Green
-Write-Host " MySQL Admin Password: $mysqlAdminPassword" -ForegroundColor Yellow
+Write-Host " PostgreSQL Server: $pgServer" -ForegroundColor Green
+Write-Host " PostgreSQL DB: $pgDbName" -ForegroundColor Green
+Write-Host " PostgreSQL Admin User: $pgAdminUser" -ForegroundColor Green
+Write-Host " PostgreSQL Admin Password: $pgAdminPassword" -ForegroundColor Yellow
 Write-Host " DATABASE_URL: $databaseUrl" -ForegroundColor Yellow
 Write-Host "============================================================" -ForegroundColor Green
-Write-Host "Every push to main now builds and deploys automatically." -ForegroundColor Green
+Write-Host "If you add a deploy workflow, rerun this script to push GitHub secrets." -ForegroundColor Green

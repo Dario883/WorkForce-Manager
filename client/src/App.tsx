@@ -1,51 +1,94 @@
-import { Toaster } from "@/components/ui/sonner";
-import { TooltipProvider } from "@/components/ui/tooltip";
-import NotFound from "@/pages/NotFound";
-import { Route, Switch } from "wouter";
-import ErrorBoundary from "./components/ErrorBoundary";
-import { ThemeProvider } from "./contexts/ThemeContext";
-import DashboardLayout from "./components/DashboardLayout";
-import Dashboard from "./pages/Dashboard";
-import People from "./pages/People";
-import PersonDetail from "./pages/PersonDetail";
-import Projects from "./pages/Projects";
-import Staffing from "./pages/Staffing";
-import CalendarWeekly from "./pages/CalendarWeekly";
-import CalendarMonthly from "./pages/CalendarMonthly";
-import CalendarYearly from "./pages/CalendarYearly";
-import Settings from "./pages/Settings";
+import { Route, Switch, Redirect } from "wouter";
+import { AuthProvider, useAuth } from "./lib/auth";
+import Layout from "./components/Layout";
+import LoginPage from "./pages/LoginPage";
+import DashboardPage from "./pages/DashboardPage";
+import PeoplePage from "./pages/PeoplePage";
+import PersonDetailPage from "./pages/PersonDetailPage";
+import ProjectsPage from "./pages/ProjectsPage";
+import StaffingPage from "./pages/StaffingPage";
+import CalendarPage from "./pages/CalendarPage";
+import SettingsPage from "./pages/SettingsPage";
 
-function Router() {
+function Protected({ children }: { children: React.ReactNode }) {
+  const { user, loading } = useAuth();
+  if (loading) {
+    return (
+      <div className="flex h-screen items-center justify-center text-slate-400">Caricamento…</div>
+    );
+  }
+  if (!user) return <Redirect to="/login" />;
+  return <>{children}</>;
+}
+
+function AppRoutes() {
   return (
-    <DashboardLayout>
-      <Switch>
-        <Route path="/" component={Dashboard} />
-        <Route path="/people" component={People} />
-        <Route path="/people/:id" component={PersonDetail} />
-        <Route path="/projects" component={Projects} />
-        <Route path="/staffing" component={Staffing} />
-        <Route path="/calendar/weekly" component={CalendarWeekly} />
-        <Route path="/calendar/monthly" component={CalendarMonthly} />
-        <Route path="/calendar/yearly" component={CalendarYearly} />
-        <Route path="/settings" component={Settings} />
-        <Route path="/404" component={NotFound} />
-        <Route component={NotFound} />
-      </Switch>
-    </DashboardLayout>
+    <Switch>
+      <Route path="/login" component={LoginPage} />
+      <Route path="/">
+        <Protected>
+          <Layout>
+            <DashboardPage />
+          </Layout>
+        </Protected>
+      </Route>
+      <Route path="/people">
+        <Protected>
+          <Layout>
+            <PeoplePage />
+          </Layout>
+        </Protected>
+      </Route>
+      <Route path="/people/:id">
+        {(params) => (
+          <Protected>
+            <Layout>
+              <PersonDetailPage id={Number(params.id)} />
+            </Layout>
+          </Protected>
+        )}
+      </Route>
+      <Route path="/projects">
+        <Protected>
+          <Layout>
+            <ProjectsPage />
+          </Layout>
+        </Protected>
+      </Route>
+      <Route path="/staffing">
+        <Protected>
+          <Layout>
+            <StaffingPage />
+          </Layout>
+        </Protected>
+      </Route>
+      <Route path="/calendar">
+        <Protected>
+          <Layout>
+            <CalendarPage />
+          </Layout>
+        </Protected>
+      </Route>
+      <Route path="/settings">
+        <Protected>
+          <Layout>
+            <SettingsPage />
+          </Layout>
+        </Protected>
+      </Route>
+      <Route>
+        <div className="flex h-screen items-center justify-center text-slate-400">
+          Pagina non trovata
+        </div>
+      </Route>
+    </Switch>
   );
 }
 
-function App() {
+export default function App() {
   return (
-    <ErrorBoundary>
-      <ThemeProvider defaultTheme="light">
-        <TooltipProvider>
-          <Toaster richColors position="top-right" />
-          <Router />
-        </TooltipProvider>
-      </ThemeProvider>
-    </ErrorBoundary>
+    <AuthProvider>
+      <AppRoutes />
+    </AuthProvider>
   );
 }
-
-export default App;

@@ -1,81 +1,37 @@
-# ============================================================
-# WorkForce Manager — CI/CD: build + deploy to Azure Web App
-# ============================================================
-#
-# SETUP (once, per environment — yours or the director's):
-#
-# 1. Create an Azure Web App:
-#    - Runtime: Node 22 LTS  |  OS: Linux
-#    - Any name/resource-group you like
-#
-# 2. In your GitHub repo → Settings → Secrets and variables → Actions:
-#    Add this repository secret from Azure "Get publish profile":
-#      AZURE_WEBAPP_PUBLISH_PROFILE
-#
-# 3. Add the following REPOSITORY VARIABLES (not secrets):
-#      AZURE_WEBAPP_NAME   → the name of your Azure Web App
-#
-# 4. In the Azure Portal, open the Web App →
-#    "Environment variables" (or "Configuration" → "App settings")
-#    and add all required runtime env vars:
-#      DATABASE_URL
-#      JWT_SECRET
-#      APP_AUTH_MODE          (default: oauth)
-#      OAUTH_SERVER_URL
-#      OWNER_OPEN_ID
-#      VITE_APP_ID            (if used)
-#      BUILT_IN_FORGE_API_URL (if used)
-#      BUILT_IN_FORGE_API_KEY (if used)
-#    These never touch this file — Azure holds them securely.
-#
-# 5. Azure Web App startup command (set in Configuration → General):
-#      node dist/index.mjs
-#
-# 6. DB migrations are NOT run automatically.
-#    Run  `pnpm db:push`  locally (or from a protected branch job)
-#    whenever the schema changes.
-#
-# ============================================================
-
-name: Build & Deploy
+name: Deploy to Azure App Service
 
 on:
   push:
-    branches: [main]
+    branches:
+      - main
+  workflow_dispatch:
 
-env:
-  NODE_VERSION: "22"
+permissions:
+  contents: read
 
 jobs:
   build-and-deploy:
     runs-on: ubuntu-latest
+
     steps:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Setup pnpm
-        uses: pnpm/action-setup@v4
-
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: ${{ env.NODE_VERSION }}
-          cache: pnpm
+          node-version: "22"
+          cache: npm
 
       - name: Install dependencies
-        run: pnpm install --frozen-lockfile
+        run: npm ci
 
       - name: Build
-        run: pnpm run build
-        env:
-          VITE_AUTH_MODE: ${{ vars.VITE_AUTH_MODE || 'local' }}
-
-      - name: Create deploy zip
-        run: zip -r deploy.zip dist package.json
+        run: npm run build
 
       - name: Deploy to Azure Web App
         uses: azure/webapps-deploy@v3
         with:
           app-name: ${{ vars.AZURE_WEBAPP_NAME }}
           publish-profile: ${{ secrets.AZURE_WEBAPP_PUBLISH_PROFILE }}
-          package: deploy.zip
+          package: .
