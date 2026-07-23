@@ -143,6 +143,9 @@ $pgDbName = "workforce_manager"
 $pgAdminUser = "wfmadmin"
 $pgAdminPassword = "Wfm!" + (New-RandomToken 18)
 $jwtSecret = New-RandomToken 32
+$seedAdminEmail = "admin@$safeBase.local"
+$seedAdminPassword = "Adm!" + (New-RandomToken 12)
+$seedAdminName = "Admin"
 
 Write-Ok "Resource group: $resourceGroup"
 Write-Ok "Web app: $appName"
@@ -240,6 +243,9 @@ Write-Ok "App settings applied"
 
 Write-Step "Applying database migrations (npm run db:migrate)"
 $env:DATABASE_URL = $databaseUrl
+$env:SEED_ADMIN_EMAIL = $seedAdminEmail
+$env:SEED_ADMIN_PASSWORD = $seedAdminPassword
+$env:SEED_ADMIN_NAME = $seedAdminName
 if (Get-Command npm -ErrorAction SilentlyContinue) {
     if (-not (Test-Path "./node_modules")) {
         npm ci
@@ -253,6 +259,12 @@ if (Get-Command npm -ErrorAction SilentlyContinue) {
         npm run db:migrate
         if ($LASTEXITCODE -eq 0) {
             Write-Ok "Database migrations applied"
+            npm run db:seed
+            if ($LASTEXITCODE -eq 0) {
+                Write-Ok "Admin seed applied"
+            } else {
+                Write-Warn "npm run db:seed failed. You can rerun manually with the seed credentials shown below."
+            }
         } else {
             Write-Warn "npm run db:migrate failed. You can rerun manually with DATABASE_URL shown below."
         }
@@ -302,6 +314,8 @@ Write-Host " PostgreSQL Server: $pgServer" -ForegroundColor Green
 Write-Host " PostgreSQL DB: $pgDbName" -ForegroundColor Green
 Write-Host " PostgreSQL Admin User: $pgAdminUser" -ForegroundColor Green
 Write-Host " PostgreSQL Admin Password: $pgAdminPassword" -ForegroundColor Yellow
+Write-Host " App Admin Email: $seedAdminEmail" -ForegroundColor Yellow
+Write-Host " App Admin Password: $seedAdminPassword" -ForegroundColor Yellow
 Write-Host " DATABASE_URL: $databaseUrl" -ForegroundColor Yellow
 Write-Host "============================================================" -ForegroundColor Green
 Write-Host "If you add a deploy workflow, rerun this script to push GitHub secrets." -ForegroundColor Green
