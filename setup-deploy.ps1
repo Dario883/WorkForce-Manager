@@ -210,8 +210,8 @@ if ($publicIp) {
     Run-OrFail {
         & $AzExe postgres flexible-server firewall-rule create `
           --resource-group $resourceGroup `
-          --server-name $pgServer `
-          --name allow-local-setup `
+          --name $pgServer `
+          --rule-name allow-local-setup `
           --start-ip-address $publicIp `
           --end-ip-address $publicIp `
           --output none
@@ -222,7 +222,7 @@ Run-OrFail {
     & $AzExe postgres flexible-server db create `
       --resource-group $resourceGroup `
       --server-name $pgServer `
-    --name $pgDbName `
+      --database-name $pgDbName `
       --output none
 } "Failed creating PostgreSQL database"
 
@@ -247,27 +247,34 @@ $env:SEED_ADMIN_EMAIL = $seedAdminEmail
 $env:SEED_ADMIN_PASSWORD = $seedAdminPassword
 $env:SEED_ADMIN_NAME = $seedAdminName
 if (Get-Command npm -ErrorAction SilentlyContinue) {
-    if (-not (Test-Path "./node_modules")) {
-        npm ci
-        if ($LASTEXITCODE -ne 0) {
-            Write-Warn "npm ci failed. Skipping migration step for now."
-            $env:DATABASE_URL = ""
-        }
-    }
-
-    if ($env:DATABASE_URL) {
-        npm run db:migrate
-        if ($LASTEXITCODE -eq 0) {
-            Write-Ok "Database migrations applied"
-            npm run db:seed
-            if ($LASTEXITCODE -eq 0) {
-                Write-Ok "Admin seed applied"
-            } else {
-                Write-Warn "npm run db:seed failed. You can rerun manually with the seed credentials shown below."
+    # npm's Windows .ps1 shim reads $MyInvocation.Statement, which does not
+    # exist under strict mode and throws PropertyNotFoundStrict.
+    Set-StrictMode -Off
+    try {
+        if (-not (Test-Path "./node_modules")) {
+            npm ci
+            if ($LASTEXITCODE -ne 0) {
+                Write-Warn "npm ci failed. Skipping migration step for now."
+                $env:DATABASE_URL = ""
             }
-        } else {
-            Write-Warn "npm run db:migrate failed. You can rerun manually with DATABASE_URL shown below."
         }
+
+        if ($env:DATABASE_URL) {
+            npm run db:migrate
+            if ($LASTEXITCODE -eq 0) {
+                Write-Ok "Database migrations applied"
+                npm run db:seed
+                if ($LASTEXITCODE -eq 0) {
+                    Write-Ok "Admin seed applied"
+                } else {
+                    Write-Warn "npm run db:seed failed. You can rerun manually with the seed credentials shown below."
+                }
+            } else {
+                Write-Warn "npm run db:migrate failed. You can rerun manually with DATABASE_URL shown below."
+            }
+        }
+    } finally {
+        Set-StrictMode -Version Latest
     }
 } else {
     Write-Warn "npm not found. Skipping migration step."
@@ -298,7 +305,12 @@ if (Test-Path ".github/workflows/deploy.yml") {
     $publishProfile | & $GhExe secret set AZURE_WEBAPP_PUBLISH_PROFILE --repo $ghRepo
     if ($LASTEXITCODE -ne 0) { throw "Failed setting GitHub secret AZURE_WEBAPP_PUBLISH_PROFILE" }
 
-    Run-OrFail { & $GhExe variable set AZURE_WEBAPP_NAME --body $appName --repo $ghRepo } "Failed setting GitHub variable AZURE_WEBAPP_NAME"
+    # Use the raw API instead of "gh variable set" (requires gh >= 2.31, not
+    # guaranteed to be present) - try create, fall back to update if it exists.
+    & $GhExe api -X POST "repos/$ghRepo/actions/variables" -f name=AZURE_WEBAPP_NAME -f value=$appName --output none 2>$null
+    if ($LASTEXITCODE -ne 0) {
+        Run-OrFail { & $GhExe api -X PATCH "repos/$ghRepo/actions/variables/AZURE_WEBAPP_NAME" -f value=$appName --output none } "Failed setting GitHub variable AZURE_WEBAPP_NAME"
+    }
     Write-Ok "GitHub CI/CD secrets/variables configured"
 } else {
     Write-Warn "No .github/workflows/deploy.yml found. Skipping GitHub secrets setup."
