@@ -1,6 +1,6 @@
 import { Fragment, useEffect, useState } from "react";
 import { api } from "../lib/api";
-import type { Assignment, Project, StaffingSnapshot } from "@shared/types";
+import type { Assignment, Project, StaffingPersonSnapshot, StaffingSnapshot } from "@shared/types";
 import { Card, CardBody } from "../components/Card";
 import Button from "../components/Button";
 import Modal from "../components/Modal";
@@ -10,6 +10,7 @@ import {
   addMonths,
   addWeeks,
   eachDayOfInterval,
+  eachWeekOfInterval,
   endOfMonth,
   endOfWeek,
   format,
@@ -21,6 +22,21 @@ import { it } from "date-fns/locale";
 
 type ViewMode = "week" | "month";
 type ViewUnit = "percentage" | "hours";
+type EditUnit = "day" | "week";
+
+// A column is either a single day (week view) or a whole week (month view).
+// Editing/creating an assignment always targets [rangeStart, rangeEnd] with
+// `unit` as the periodType/split unit, so month-view edits apply to the
+// entire underlying week instead of a single day.
+type Column = {
+  key: string;
+  label1: string;
+  label2: string;
+  rangeStart: string;
+  rangeEnd: string;
+  weekend: boolean;
+  unit: EditUnit;
+};
 
 function allocColor(total: number) {
   if (total === 0) return "bg-slate-50 text-slate-300";
@@ -48,6 +64,49 @@ function hoursToPct(hours: number, capacityHoursPerWeek: number): number {
   return Math.round((hours / capacity) * 100);
 }
 
+function buildColumns(view: ViewMode, rangeStart: Date, rangeEnd: Date): Column[] {
+  if (view === "week") {
+    return eachDayOfInterval({ start: rangeStart, end: rangeEnd }).map((d) => {
+      const key = format(d, "yyyy-MM-dd");
+      return {
+        key,
+        label1: format(d, "EEE", { locale: it }),
+        label2: format(d, "d/M"),
+        rangeStart: key,
+        rangeEnd: key,
+        weekend: isWeekend(d),
+        unit: "day" as const,
+      };
+    });
+  }
+  return eachWeekOfInterval({ start: rangeStart, end: rangeEnd }, { weekStartsOn: 1 }).map((weekStart) => {
+    const weekEnd = endOfWeek(weekStart, { weekStartsOn: 1 });
+    return {
+      key: format(weekStart, "yyyy-MM-dd"),
+      label1: `Sett. ${format(weekStart, "d/M")}`,
+      label2: `→ ${format(weekEnd, "d/M")}`,
+      rangeStart: format(weekStart, "yyyy-MM-dd"),
+      rangeEnd: format(weekEnd, "yyyy-MM-dd"),
+      weekend: false,
+      unit: "week" as const,
+    };
+  });
+}
+
+// A representative day is only needed to look up the (per-day) staffing
+// snapshot for a week-column in month view — the underlying data is still
+// per-day, so we show the first day in the week that actually has an
+// allocation (falling back to the week's Monday if none do).
+function snapshotDayForColumn(person: StaffingPersonSnapshot, col: Column) {
+  if (col.unit === "day") return person.days[col.key];
+  const daysInRange = eachDayOfInterval({ start: new Date(col.rangeStart), end: new Date(col.rangeEnd) });
+  for (const d of daysInRange) {
+    const k = format(d, "yyyy-MM-dd");
+    if (person.days[k] && person.days[k].total > 0) return person.days[k];
+  }
+  return person.days[col.rangeStart];
+}
+
 type DayCell = { assignmentId: number; percentage: number };
 type ProjectRow = {
   key: string;
@@ -59,14 +118,17 @@ type ProjectRow = {
 };
 
 // Assignments for the same project are grouped into a single visual row
-// whenever their date ranges don't overlap (e.g. after splitting a day for a
-// percentage change) — editing a free cell then never needs to add a row.
+// whenever their date ranges don't overlap (e.g. after splitting a period for
+// a percentage change) — editing a free cell then never needs to add a row.
 // If two assignments of the same project DO overlap (e.g. a genuine second
 // allocation was added on top), they must stay visible and editable as
 // separate rows — silently summing them would hide real data from the user.
 // This is a standard interval-partitioning: assignments are packed into the
-// fewest non-overlapping "lines" per project.
-function buildProjectRows(rows: Assignment[], dayKeys: string[]): ProjectRow[] {
+// fewest non-overlapping "lines" per project. Note the set of lines needed
+// reflects ALL assignments overlapping the visible range, so a wider range
+// (month) can legitimately need more lines than a narrower one (week) if the
+// project has genuinely overlapping segments spread across different weeks.
+function buildProjectRows(rows: Assignment[], columns: Column[]): ProjectRow[] {
   const byProject = new Map<number, Assignment[]>();
   for (const a of rows) {
     const list = byProject.get(a.projectId) ?? [];
@@ -87,10 +149,9 @@ function buildProjectRows(rows: Assignment[], dayKeys: string[]): ProjectRow[] {
     lines.forEach((line, idx) => {
       const byDay: Record<string, DayCell> = {};
       for (const a of line) {
-        for (const key of dayKeys) {
-          if (key >= a.startDate && key <= a.endDate) {
-            byDay[key] = { assignmentId: a.id, percentage: a.percentage };
-          }
+        for (const col of columns) {
+          if (col.rangeEnd < a.startDate || col.rangeStart > a.endDate) continue;
+          byDay[col.key] = { assignmentId: a.id, percentage: a.percentage };
         }
       }
       result.push({
@@ -120,6 +181,14 @@ function TrashIcon() {
   );
 }
 
+type EditCellTarget = {
+  personId: number;
+  personName: string;
+  rangeStart: string;
+  rangeEnd: string;
+  unit: EditUnit;
+};
+
 export default function CalendarPage() {
   const [view, setView] = useState<ViewMode>("week");
   const [viewUnit, setViewUnit] = useState<ViewUnit>("percentage");
@@ -127,9 +196,7 @@ export default function CalendarPage() {
   const [snapshot, setSnapshot] = useState<StaffingSnapshot | null>(null);
   const [loading, setLoading] = useState(true);
   const [projects, setProjects] = useState<Project[]>([]);
-  const [editCell, setEditCell] = useState<{ personId: number; personName: string; date: string } | null>(
-    null
-  );
+  const [editCell, setEditCell] = useState<EditCellTarget | null>(null);
   const [expanded, setExpanded] = useState<Record<number, boolean>>({});
   const [personAssignments, setPersonAssignments] = useState<Record<number, Assignment[]>>({});
   const [loadingRows, setLoadingRows] = useState<Record<number, boolean>>({});
@@ -155,7 +222,7 @@ export default function CalendarPage() {
     api.get<Project[]>("/projects").then(setProjects);
   }, []);
 
-  const days = eachDayOfInterval({ start: range.start, end: range.end });
+  const columns = buildColumns(view, range.start, range.end);
 
   function shiftPeriod(dir: 1 | -1) {
     setAnchor((a) => (view === "week" ? addWeeks(a, dir) : addMonths(a, dir)));
@@ -179,19 +246,23 @@ export default function CalendarPage() {
     personId: number,
     projectId: number,
     existingAssignmentId: number | null,
-    date: string,
+    col: Column,
     percentage: number
   ) {
     if (existingAssignmentId) {
-      await api.post(`/assignments/${existingAssignmentId}/split`, { date, unit: "day", percentage });
+      await api.post(`/assignments/${existingAssignmentId}/split`, {
+        date: col.rangeStart,
+        unit: col.unit,
+        percentage,
+      });
     } else {
       await api.post("/assignments", {
         personId,
         projectId,
         percentage,
-        startDate: date,
-        endDate: date,
-        periodType: "day",
+        startDate: col.rangeStart,
+        endDate: col.rangeEnd,
+        periodType: col.unit,
       });
     }
     await Promise.all([loadPersonAssignments(personId), load()]);
@@ -269,13 +340,15 @@ export default function CalendarPage() {
                   <th className="sticky left-0 z-10 min-w-[200px] border-b border-r border-slate-100 bg-white px-4 py-3 text-left text-xs uppercase text-slate-500">
                     Persona
                   </th>
-                  {days.map((d) => (
+                  {columns.map((col) => (
                     <th
-                      key={d.toISOString()}
-                      className="min-w-[70px] border-b border-slate-100 px-2 py-3 text-center text-xs font-medium text-slate-500"
+                      key={col.key}
+                      className={`${
+                        view === "month" ? "min-w-[90px]" : "min-w-[70px]"
+                      } border-b border-slate-100 px-2 py-3 text-center text-xs font-medium text-slate-500`}
                     >
-                      <div>{format(d, "EEE", { locale: it })}</div>
-                      <div className="text-slate-400">{format(d, "d/M")}</div>
+                      <div>{col.label1}</div>
+                      <div className="text-slate-400">{col.label2}</div>
                     </th>
                   ))}
                   <th className="min-w-[40px] border-b border-slate-100"></th>
@@ -288,8 +361,7 @@ export default function CalendarPage() {
                   const visibleRows = rows.filter(
                     (a) => a.endDate >= format(range.start, "yyyy-MM-dd") && a.startDate <= format(range.end, "yyyy-MM-dd")
                   );
-                  const dayKeys = days.map((d) => format(d, "yyyy-MM-dd"));
-                  const projectRows = buildProjectRows(visibleRows, dayKeys);
+                  const projectRows = buildProjectRows(visibleRows, columns);
                   return (
                     <Fragment key={person.personId}>
                       <tr className="border-b border-slate-50">
@@ -303,22 +375,26 @@ export default function CalendarPage() {
                           </button>
                           {person.personName}
                         </td>
-                        {days.map((d) => {
-                          const key = format(d, "yyyy-MM-dd");
-                          const cell = person.days[key];
+                        {columns.map((col) => {
+                          const cell = snapshotDayForColumn(person, col);
                           const total = cell?.total ?? 0;
-                          const weekend = isWeekend(d);
                           const label =
                             viewUnit === "percentage"
                               ? total > 0
                                 ? `${total}%`
                                 : "—"
-                              : pctToHoursLabel(total, person.capacityHoursPerWeek, weekend);
+                              : pctToHoursLabel(total, person.capacityHoursPerWeek, col.weekend);
                           return (
-                            <td key={key} className="p-1 text-center">
+                            <td key={col.key} className="p-1 text-center">
                               <button
                                 onClick={() =>
-                                  setEditCell({ personId: person.personId, personName: person.personName, date: key })
+                                  setEditCell({
+                                    personId: person.personId,
+                                    personName: person.personName,
+                                    rangeStart: col.rangeStart,
+                                    rangeEnd: col.rangeEnd,
+                                    unit: col.unit,
+                                  })
                                 }
                                 className={`h-10 w-full rounded-md text-xs font-semibold transition hover:ring-2 hover:ring-brand-300 ${allocColor(
                                   total
@@ -335,7 +411,7 @@ export default function CalendarPage() {
 
                       {isExpanded && loadingRows[person.personId] && (
                         <tr key={`${person.personId}-loading`}>
-                          <td colSpan={days.length + 2} className="bg-slate-50/40 px-4 py-2 text-xs text-slate-400">
+                          <td colSpan={columns.length + 2} className="bg-slate-50/40 px-4 py-2 text-xs text-slate-400">
                             Caricamento assegnazioni…
                           </td>
                         </tr>
@@ -343,93 +419,98 @@ export default function CalendarPage() {
 
                       {isExpanded &&
                         !loadingRows[person.personId] &&
-                        projectRows.map((g) => (
-                          <tr key={`${person.personId}-${g.key}`} className="border-b border-slate-50 bg-slate-50/40">
-                            <td className="sticky left-0 z-10 border-r border-slate-100 bg-slate-50/40 px-4 py-1.5 pl-9 text-xs text-slate-600">
-                              <span
-                                className="mr-1.5 inline-block h-2 w-2 rounded-full align-middle"
-                                style={{ backgroundColor: g.projectColor }}
-                              />
-                              <select
-                                value={g.projectId}
-                                title="Cambia progetto (percentuali e date restano invariate)"
-                                className="rounded border-none bg-transparent py-0.5 text-xs text-slate-600 hover:bg-slate-100 focus:outline-none focus:ring-1 focus:ring-brand-400"
-                                onChange={(e) =>
-                                  handleChangeRowProject(g.assignmentIds, person.personId, Number(e.target.value))
-                                }
-                              >
-                                {projects.map((p) => (
-                                  <option key={p.id} value={p.id}>
-                                    {p.name}
-                                  </option>
-                                ))}
-                              </select>
-                            </td>
-                            {days.map((d) => {
-                              const key = format(d, "yyyy-MM-dd");
-                              const weekend = isWeekend(d);
-                              const cell = g.byDay[key];
-
-                              if (viewUnit === "hours" && weekend) {
-                                return (
-                                  <td
-                                    key={key}
-                                    className="p-1 text-center text-xs text-slate-300"
-                                    title="Passa alla vista % per modificare i weekend"
-                                  >
-                                    —
-                                  </td>
-                                );
-                              }
-                              const pct = cell?.percentage ?? null;
-                              const displayValue =
-                                pct === null
-                                  ? ""
-                                  : viewUnit === "percentage"
-                                  ? pct
-                                  : Math.round(dailyCapacity(person.capacityHoursPerWeek) * (pct / 100) * 10) / 10;
-                              return (
-                                <td key={key} className="p-1">
-                                  <input
-                                    type="number"
-                                    defaultValue={displayValue}
-                                    placeholder="—"
-                                    key={`${g.key}-${key}-${displayValue}-${viewUnit}`}
-                                    className="h-8 w-full rounded border border-slate-200 text-center text-xs placeholder:text-slate-300 focus:border-brand-400 focus:outline-none"
-                                    onBlur={(e) => {
-                                      const raw = e.target.value.trim();
-                                      if (raw === "") return;
-                                      const rawNum = Number(raw);
-                                      if (Number.isNaN(rawNum)) return;
-                                      const newPct = viewUnit === "percentage" ? rawNum : hoursToPct(rawNum, person.capacityHoursPerWeek);
-                                      if (pct !== null && newPct === pct) return;
-                                      handleCellCommit(person.personId, g.projectId, cell?.assignmentId ?? null, key, newPct);
-                                    }}
+                        projectRows.map((g) => {
+                          return (
+                            <Fragment key={g.key}>
+                              <tr className="border-b border-slate-50 bg-slate-50/40">
+                                <td className="sticky left-0 z-10 border-r border-slate-100 bg-slate-50/40 px-4 py-1.5 pl-9 text-xs text-slate-600">
+                                  <span
+                                    className="mr-1.5 inline-block h-2 w-2 rounded-full align-middle"
+                                    style={{ backgroundColor: g.projectColor }}
                                   />
+                                  <select
+                                    value={g.projectId}
+                                    title="Cambia progetto (percentuali e date restano invariate)"
+                                    className="rounded border-none bg-transparent py-0.5 text-xs text-slate-600 hover:bg-slate-100 focus:outline-none focus:ring-1 focus:ring-brand-400"
+                                    onChange={(e) =>
+                                      handleChangeRowProject(g.assignmentIds, person.personId, Number(e.target.value))
+                                    }
+                                  >
+                                    {projects.map((p) => (
+                                      <option key={p.id} value={p.id}>
+                                        {p.name}
+                                      </option>
+                                    ))}
+                                  </select>
                                 </td>
-                              );
-                            })}
-                            <td className="p-1 text-center">
-                              <button
-                                className="inline-flex h-7 w-7 items-center justify-center rounded text-slate-400 hover:bg-red-50 hover:text-red-600"
-                                title="Rimuovi assegnazione"
-                                onClick={() => handleDeleteGroup(g.assignmentIds, person.personId)}
-                              >
-                                <TrashIcon />
-                              </button>
-                            </td>
-                          </tr>
-                        ))}
+                                {columns.map((col) => {
+                                  const cell = g.byDay[col.key];
+
+                                  if (viewUnit === "hours" && col.weekend) {
+                                    return (
+                                      <td
+                                        key={col.key}
+                                        className="p-1 text-center text-xs text-slate-300"
+                                        title="Passa alla vista % per modificare i weekend"
+                                      >
+                                        —
+                                      </td>
+                                    );
+                                  }
+                                  const pct = cell?.percentage ?? null;
+                                  const displayValue =
+                                    pct === null
+                                      ? ""
+                                      : viewUnit === "percentage"
+                                      ? pct
+                                      : Math.round(dailyCapacity(person.capacityHoursPerWeek) * (pct / 100) * 10) / 10;
+                                  return (
+                                    <td key={col.key} className="p-1">
+                                      <input
+                                        type="number"
+                                        defaultValue={displayValue}
+                                        placeholder="—"
+                                        key={`${g.key}-${col.key}-${displayValue}-${viewUnit}`}
+                                        className="h-8 w-full rounded border border-slate-200 text-center text-xs placeholder:text-slate-300 focus:border-brand-400 focus:outline-none"
+                                        onBlur={(e) => {
+                                          const raw = e.target.value.trim();
+                                          if (raw === "") return;
+                                          const rawNum = Number(raw);
+                                          if (Number.isNaN(rawNum)) return;
+                                          const newPct =
+                                            viewUnit === "percentage" ? rawNum : hoursToPct(rawNum, person.capacityHoursPerWeek);
+                                          if (pct !== null && newPct === pct) return;
+                                          handleCellCommit(person.personId, g.projectId, cell?.assignmentId ?? null, col, newPct);
+                                        }}
+                                      />
+                                    </td>
+                                  );
+                                })}
+                                <td className="p-1 text-center">
+                                  <button
+                                    className="inline-flex h-7 w-7 items-center justify-center rounded text-slate-400 hover:bg-red-50 hover:text-red-600"
+                                    title="Rimuovi assegnazione"
+                                    onClick={() => handleDeleteGroup(g.assignmentIds, person.personId)}
+                                  >
+                                    <TrashIcon />
+                                  </button>
+                                </td>
+                              </tr>
+                            </Fragment>
+                          );
+                        })}
 
                       {isExpanded && !loadingRows[person.personId] && (
                         <tr key={`${person.personId}-add`} className="border-b border-slate-100 bg-slate-50/40">
-                          <td colSpan={days.length + 2} className="px-4 py-1.5 pl-9">
-                            <button
-                              className="text-xs font-medium text-brand-600 hover:underline"
-                              onClick={() => setAddFor({ id: person.personId, name: person.personName })}
-                            >
-                              + Nuova assegnazione
-                            </button>
+                          <td colSpan={columns.length + 2} className="p-0">
+                            <div className="sticky left-0 w-fit px-4 py-1.5 pl-9">
+                              <button
+                                className="text-xs font-medium text-brand-600 hover:underline"
+                                onClick={() => setAddFor({ id: person.personId, name: person.personName })}
+                              >
+                                + Nuova assegnazione
+                              </button>
+                            </div>
                           </td>
                         </tr>
                       )}
@@ -498,7 +579,7 @@ function EditCellModal({
   onClose,
   onSaved,
 }: {
-  cell: { personId: number; personName: string; date: string };
+  cell: EditCellTarget;
   viewUnit: ViewUnit;
   onClose: () => void;
   onSaved: () => void;
@@ -516,12 +597,7 @@ function EditCellModal({
     api
       .get<any[]>(`/assignments?personId=${cell.personId}`)
       .then((all) => {
-        const dayDate = new Date(cell.date);
-        const active = all.filter((a) => {
-          const s = new Date(a.startDate);
-          const e = new Date(a.endDate);
-          return dayDate >= s && dayDate <= e;
-        });
+        const active = all.filter((a) => a.startDate <= cell.rangeEnd && a.endDate >= cell.rangeStart);
         setAssignments(active);
         setEdits(Object.fromEntries(active.map((a) => [a.id, a.percentage])));
       })
@@ -536,8 +612,8 @@ function EditCellModal({
         const newPct = edits[a.id];
         if (newPct !== a.percentage) {
           await api.post(`/assignments/${a.id}/split`, {
-            date: cell.date,
-            unit: "day",
+            date: cell.rangeStart,
+            unit: cell.unit,
             percentage: newPct,
           });
         }
@@ -556,20 +632,24 @@ function EditCellModal({
         assignment={null}
         projects={projects}
         lockedPerson={{ id: cell.personId, name: cell.personName }}
-        defaultStartDate={cell.date}
-        defaultEndDate={cell.date}
+        defaultStartDate={cell.rangeStart}
+        defaultEndDate={cell.rangeEnd}
         onSaved={onSaved}
       />
     );
   }
 
+  const periodLabel = cell.rangeStart === cell.rangeEnd ? cell.rangeStart : `${cell.rangeStart} → ${cell.rangeEnd}`;
+
   return (
-    <Modal open onClose={onClose} title={`${cell.personName} · ${cell.date}`}>
+    <Modal open onClose={onClose} title={`${cell.personName} · ${periodLabel}`}>
       {loading ? (
         <p className="text-sm text-slate-400">Caricamento…</p>
       ) : assignments.length === 0 ? (
         <div>
-          <p className="mb-3 text-sm text-slate-400">Nessuna assegnazione attiva in questo giorno.</p>
+          <p className="mb-3 text-sm text-slate-400">
+            {cell.unit === "week" ? "Nessuna assegnazione attiva in questa settimana." : "Nessuna assegnazione attiva in questo giorno."}
+          </p>
           <div className="flex justify-end gap-2">
             <Button variant="secondary" onClick={onClose}>
               Chiudi
@@ -580,7 +660,9 @@ function EditCellModal({
       ) : (
         <div>
           <p className="mb-3 text-xs text-slate-500">
-            Modifica la percentuale per questo giorno soltanto — l'assegnazione verrà divisa automaticamente.
+            {cell.unit === "week"
+              ? "Modifica la percentuale per questa settimana soltanto — l'assegnazione verrà divisa automaticamente."
+              : "Modifica la percentuale per questo giorno soltanto — l'assegnazione verrà divisa automaticamente."}
           </p>
           {assignments.map((a) => (
             <Field key={a.id} label={a.projectName}>
