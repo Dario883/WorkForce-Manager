@@ -1,11 +1,13 @@
 import { Route, Switch, Redirect } from "wouter";
 import { AuthProvider, useAuth } from "./lib/auth";
+import { ThemeProvider } from "./lib/theme";
 import Layout from "./components/Layout";
 import LoginPage from "./pages/LoginPage";
 import DashboardPage from "./pages/DashboardPage";
 import PeoplePage from "./pages/PeoplePage";
 import PersonDetailPage from "./pages/PersonDetailPage";
 import ProjectsPage from "./pages/ProjectsPage";
+import ProjectDetailPage from "./pages/ProjectDetailPage";
 import StaffingPage from "./pages/StaffingPage";
 import CalendarPage from "./pages/CalendarPage";
 import SettingsPage from "./pages/SettingsPage";
@@ -55,6 +57,15 @@ function AppRoutes() {
           </Layout>
         </Protected>
       </Route>
+      <Route path="/projects/:id">
+        {(params) => (
+          <Protected>
+            <Layout>
+              <ProjectDetailPage id={Number(params.id)} />
+            </Layout>
+          </Protected>
+        )}
+      </Route>
       <Route path="/staffing">
         <Protected>
           <Layout>
@@ -87,8 +98,10 @@ function AppRoutes() {
 
 export default function App() {
   return (
-    <AuthProvider>
-      <AppRoutes />
-    </AuthProvider>
+    <ThemeProvider>
+      <AuthProvider>
+        <AppRoutes />
+      </AuthProvider>
+    </ThemeProvider>
   );
 }

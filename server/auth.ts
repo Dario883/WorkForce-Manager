@@ -1,6 +1,9 @@
 import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
 import type { Request, Response, NextFunction } from "express";
+import { db } from "./db";
+import { users } from "./schema";
+import { eq } from "drizzle-orm";
 
 const JWT_SECRET = process.env.JWT_SECRET || "dev-only-secret-change-me";
 const COOKIE_NAME = "wfm_session";
@@ -61,10 +64,18 @@ export function readSessionFromRequest(req: Request): AuthPayload | null {
   return verifySession(token);
 }
 
-/** Attaches req.user if a valid session cookie is present; does not block the request. */
-export function attachUser(req: Request, _res: Response, next: NextFunction) {
-  const user = readSessionFromRequest(req);
-  if (user) req.user = user;
+/**
+ * Attaches req.user if a valid session cookie is present; does not block the
+ * request. Re-checks the user is still active on every request (rather than
+ * trusting the JWT alone) so deactivating a user takes effect immediately
+ * instead of waiting out the token's remaining lifetime.
+ */
+export async function attachUser(req: Request, _res: Response, next: NextFunction) {
+  const session = readSessionFromRequest(req);
+  if (session) {
+    const [row] = await db.select({ active: users.active }).from(users).where(eq(users.id, session.userId)).limit(1);
+    if (row?.active) req.user = session;
+  }
   next();
 }
 

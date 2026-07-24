@@ -91,7 +91,7 @@ export default function AssignmentModal({
       <form onSubmit={handleSubmit}>
         <Field label="Persona">
           {lockedPerson ? (
-            <p className="rounded-md border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-600">
+            <p className="rounded-md border border-slate-200 dark:border-slate-600 bg-slate-50 dark:bg-slate-700/40 px-3 py-2 text-sm text-slate-600 dark:text-slate-300">
               {lockedPerson.name}
             </p>
           ) : (
@@ -121,7 +121,7 @@ export default function AssignmentModal({
         </Field>
         {!assignment && (
           <Field label="Se il progetto ha già un'assegnazione in questo periodo">
-            <div className="flex rounded-lg border border-slate-200 bg-white p-0.5">
+            <div className="flex rounded-lg border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-800 p-0.5">
               {(
                 [
                   { value: "new" as const, label: "Crea nuova riga" },
@@ -133,7 +133,7 @@ export default function AssignmentModal({
                   type="button"
                   onClick={() => setMode(opt.value)}
                   className={`flex-1 rounded-md px-3 py-1.5 text-xs font-medium ${
-                    mode === opt.value ? "bg-brand-500 text-white" : "text-slate-600"
+                    mode === opt.value ? "bg-brand-500 text-white" : "text-slate-600 dark:text-slate-300"
                   }`}
                 >
                   {opt.label}

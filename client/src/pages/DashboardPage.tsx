@@ -153,17 +153,17 @@ export default function DashboardPage() {
     <div>
       <div className="mb-6 flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-slate-900">Dashboard</h1>
-          <p className="text-sm text-slate-500">{periodLabel}</p>
+          <h1 className="text-2xl font-bold text-slate-900 dark:text-slate-100">Dashboard</h1>
+          <p className="text-sm text-slate-500 dark:text-slate-400">{periodLabel}</p>
         </div>
         <div className="flex items-center gap-2">
-          <div className="flex rounded-lg border border-slate-200 bg-white p-0.5">
+          <div className="flex rounded-lg border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-800 p-0.5">
             {(["week", "month", "year"] as PeriodView[]).map((m) => (
               <button
                 key={m}
                 onClick={() => setView(m)}
                 className={`rounded-md px-3 py-1.5 text-sm font-medium ${
-                  view === m ? "bg-brand-500 text-white" : "text-slate-600"
+                  view === m ? "bg-brand-500 text-white" : "text-slate-600 dark:text-slate-300"
                 }`}
               >
                 {m === "week" ? "Settimana" : m === "month" ? "Mese" : "Anno"}
@@ -183,7 +183,7 @@ export default function DashboardPage() {
       </div>
 
       {loading ? (
-        <p className="text-slate-400">Caricamento…</p>
+        <p className="text-slate-400 dark:text-slate-500">Caricamento…</p>
       ) : (
         <>
       <div className="mb-6 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
@@ -227,8 +227,8 @@ export default function DashboardPage() {
       <Card>
         <CardHeader className="flex items-center justify-between">
           <div>
-            <h2 className="font-semibold text-slate-800">Allocazione per persona</h2>
-            <p className="text-xs text-slate-500">Media nel periodo selezionato</p>
+            <h2 className="font-semibold text-slate-800 dark:text-slate-100">Allocazione per persona</h2>
+            <p className="text-xs text-slate-500 dark:text-slate-400">Media nel periodo selezionato</p>
           </div>
           <Link href="/settings" className="text-xs font-medium text-brand-600 hover:underline">
             Modifica soglie →
@@ -236,7 +236,7 @@ export default function DashboardPage() {
         </CardHeader>
         <CardBody className="space-y-3">
           {avgPerPerson.length === 0 && (
-            <p className="py-4 text-center text-sm text-slate-400">Nessun dato per il periodo selezionato</p>
+            <p className="py-4 text-center text-sm text-slate-400 dark:text-slate-500">Nessun dato per il periodo selezionato</p>
           )}
           {[...avgPerPerson]
             .sort((a, b) => b.avg - a.avg)
@@ -256,14 +256,14 @@ export default function DashboardPage() {
                 <Link
                   key={p.personId}
                   href={`/people/${p.personId}`}
-                  className="block rounded-lg px-2 py-1.5 transition hover:bg-slate-50"
+                  className="block rounded-lg px-2 py-1.5 transition hover:bg-slate-50 dark:hover:bg-slate-700"
                 >
                   <div className="mb-1 flex items-center justify-between text-sm">
-                    <span className="text-slate-700">{p.personName}</span>
-                    <span className="font-semibold text-slate-700">{Math.round(p.avg)}%</span>
+                    <span className="text-slate-700 dark:text-slate-200">{p.personName}</span>
+                    <span className="font-semibold text-slate-700 dark:text-slate-200">{Math.round(p.avg)}%</span>
                   </div>
                   <div
-                    className="relative h-2.5 w-full overflow-hidden rounded-full bg-slate-100"
+                    className="relative h-2.5 w-full overflow-hidden rounded-full bg-slate-100 dark:bg-slate-700"
                     title={`${p.personName}: ${Math.round(p.avg)}% (media periodo)`}
                   >
                     <div className={`h-full rounded-full ${color}`} style={{ width: `${fillWidth}%` }} />
@@ -273,7 +273,7 @@ export default function DashboardPage() {
               );
             })}
         </CardBody>
-        <div className="flex flex-wrap items-center gap-4 border-t border-slate-100 px-5 py-3 text-xs text-slate-500">
+        <div className="flex flex-wrap items-center gap-4 border-t border-slate-100 dark:border-slate-700 px-5 py-3 text-xs text-slate-500 dark:text-slate-400">
           <span className="flex items-center gap-1.5">
             <span className="h-2.5 w-2.5 rounded-full bg-slate-200" />
             0%
@@ -295,12 +295,12 @@ export default function DashboardPage() {
 
       <Card className="mt-4">
         <CardHeader>
-          <h2 className="font-semibold text-slate-800">Progetti per stato</h2>
-          <p className="text-xs text-slate-500">{projects.length} progetti totali</p>
+          <h2 className="font-semibold text-slate-800 dark:text-slate-100">Progetti per stato</h2>
+          <p className="text-xs text-slate-500 dark:text-slate-400">{projects.length} progetti totali</p>
         </CardHeader>
         <CardBody>
           {projects.length === 0 ? (
-            <p className="py-4 text-center text-sm text-slate-400">Nessun progetto registrato</p>
+            <p className="py-4 text-center text-sm text-slate-400 dark:text-slate-500">Nessun progetto registrato</p>
           ) : (
             <>
               <div className="flex h-6 w-full overflow-hidden rounded-full">
@@ -324,7 +324,7 @@ export default function DashboardPage() {
                     );
                   })}
               </div>
-              <div className="mt-3 flex flex-wrap gap-4 text-xs text-slate-500">
+              <div className="mt-3 flex flex-wrap gap-4 text-xs text-slate-500 dark:text-slate-400">
                 {statusCounts.map((s) => (
                   <span key={s.status} className="flex items-center gap-1.5">
                     <span className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: STATUS_COLOR[s.status] }} />
@@ -340,16 +340,16 @@ export default function DashboardPage() {
       <div className="mt-4 grid grid-cols-1 gap-4 lg:grid-cols-2">
         <Card>
           <CardHeader>
-            <h2 className="font-semibold text-slate-800">Progetti in scadenza</h2>
-            <p className="text-xs text-slate-500">Attivi, entro {UPCOMING_DEADLINE_DAYS} giorni</p>
+            <h2 className="font-semibold text-slate-800 dark:text-slate-100">Progetti in scadenza</h2>
+            <p className="text-xs text-slate-500 dark:text-slate-400">Attivi, entro {UPCOMING_DEADLINE_DAYS} giorni</p>
           </CardHeader>
           <CardBody className="space-y-2">
             {projectsNearingDeadline.length === 0 && (
-              <p className="py-4 text-center text-sm text-slate-400">Nessun progetto in scadenza a breve</p>
+              <p className="py-4 text-center text-sm text-slate-400 dark:text-slate-500">Nessun progetto in scadenza a breve</p>
             )}
             {projectsNearingDeadline.map((p) => (
-              <div key={p.id} className="flex items-center justify-between rounded-lg bg-slate-50 px-3 py-2">
-                <span className="text-sm text-slate-700">{p.name}</span>
+              <div key={p.id} className="flex items-center justify-between rounded-lg bg-slate-50 dark:bg-slate-700/40 px-3 py-2">
+                <span className="text-sm text-slate-700 dark:text-slate-200">{p.name}</span>
                 <Badge color="#d97706">{p.endDate}</Badge>
               </div>
             ))}
@@ -358,16 +358,16 @@ export default function DashboardPage() {
 
         <Card>
           <CardHeader>
-            <h2 className="font-semibold text-slate-800">Progetti senza risorse</h2>
-            <p className="text-xs text-slate-500">Attivi, nessuna assegnazione nel periodo</p>
+            <h2 className="font-semibold text-slate-800 dark:text-slate-100">Progetti senza risorse</h2>
+            <p className="text-xs text-slate-500 dark:text-slate-400">Attivi, nessuna assegnazione nel periodo</p>
           </CardHeader>
           <CardBody className="space-y-2">
             {projectsWithoutResources.length === 0 && (
-              <p className="py-4 text-center text-sm text-slate-400">Tutti i progetti attivi hanno risorse</p>
+              <p className="py-4 text-center text-sm text-slate-400 dark:text-slate-500">Tutti i progetti attivi hanno risorse</p>
             )}
             {projectsWithoutResources.map((p) => (
-              <div key={p.id} className="flex items-center justify-between rounded-lg bg-slate-50 px-3 py-2">
-                <span className="text-sm text-slate-700">{p.name}</span>
+              <div key={p.id} className="flex items-center justify-between rounded-lg bg-slate-50 dark:bg-slate-700/40 px-3 py-2">
+                <span className="text-sm text-slate-700 dark:text-slate-200">{p.name}</span>
                 <Badge color="#dc2626">{p.client ?? "—"}</Badge>
               </div>
             ))}
@@ -396,22 +396,22 @@ function KpiCard({
   trendDelta?: number;
 }) {
   const toneColor: Record<string, string> = {
-    ok: "text-emerald-600",
-    warn: "text-amber-600",
-    danger: "text-red-600",
-    neutral: "text-slate-900",
+    ok: "text-emerald-600 dark:text-emerald-400",
+    warn: "text-amber-600 dark:text-amber-400",
+    danger: "text-red-600 dark:text-red-400",
+    neutral: "text-slate-900 dark:text-slate-100",
   };
   const roundedDelta = trendDelta !== undefined ? Math.round(trendDelta) : 0;
   const body = (
     <CardBody className="flex items-center gap-4">
-      <div className="grid h-11 w-11 shrink-0 place-items-center rounded-lg bg-brand-50 text-xl">{icon}</div>
+      <div className="grid h-11 w-11 shrink-0 place-items-center rounded-lg bg-brand-50 dark:bg-brand-500/10 text-xl">{icon}</div>
       <div>
         <div className={`text-2xl font-bold ${toneColor[tone]}`}>{value}</div>
-        <div className="text-xs text-slate-500">{label}</div>
+        <div className="text-xs text-slate-500 dark:text-slate-400">{label}</div>
         {trendDelta !== undefined && (
           <div
             className={`mt-0.5 text-xs font-medium ${
-              roundedDelta === 0 ? "text-slate-400" : roundedDelta > 0 ? "text-slate-600" : "text-slate-600"
+              roundedDelta === 0 ? "text-slate-400 dark:text-slate-500" : roundedDelta > 0 ? "text-slate-600 dark:text-slate-300" : "text-slate-600 dark:text-slate-300"
             }`}
             title="Rispetto al periodo precedente"
           >

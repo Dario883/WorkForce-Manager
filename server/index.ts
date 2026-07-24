@@ -5,12 +5,14 @@ import cookieParser from "cookie-parser";
 import path from "path";
 import { fileURLToPath } from "url";
 import { attachUser, requireAuth } from "./auth";
+import { asyncHandler } from "./asyncHandler";
 import { authRouter } from "./routes/auth";
 import { peopleRouter } from "./routes/people";
 import { projectsRouter } from "./routes/projects";
 import { assignmentsRouter } from "./routes/assignments";
 import { staffingRouter } from "./routes/staffing";
 import { settingsRouter } from "./routes/settings";
+import { usersRouter } from "./routes/users";
 
 process.on("unhandledRejection", (reason) => {
   console.error("Unhandled promise rejection:", reason);
@@ -21,7 +23,7 @@ const app = express();
 
 app.use(express.json());
 app.use(cookieParser());
-app.use(attachUser);
+app.use(asyncHandler(attachUser));
 
 // Public
 app.use("/api/auth", authRouter);
@@ -32,6 +34,7 @@ app.use("/api/projects", requireAuth, projectsRouter);
 app.use("/api/assignments", requireAuth, assignmentsRouter);
 app.use("/api/staffing", requireAuth, staffingRouter);
 app.use("/api/settings", requireAuth, settingsRouter);
+app.use("/api/users", requireAuth, usersRouter);
 
 if (process.env.NODE_ENV === "production") {
   const publicDir = path.join(__dirname, "public");

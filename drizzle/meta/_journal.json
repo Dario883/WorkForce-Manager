@@ -22,6 +22,13 @@
       "when": 1784918751033,
       "tag": "0002_enforce_project_commessa_id_and_name_unique",
       "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1784926827949,
+      "tag": "0003_add_users_active_flag",
+      "breakpoints": true
     }
   ]
 }

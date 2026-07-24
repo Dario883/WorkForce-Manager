@@ -44,10 +44,10 @@ type Column = {
 };
 
 function allocColor(total: number) {
-  if (total === 0) return "bg-slate-50 text-slate-300";
-  if (total < 70) return "bg-amber-50 text-amber-700";
-  if (total <= 100) return "bg-emerald-50 text-emerald-700";
-  return "bg-red-50 text-red-700";
+  if (total === 0) return "bg-slate-50 text-slate-300 dark:bg-slate-700/40 dark:text-slate-500";
+  if (total < 70) return "bg-amber-50 text-amber-700 dark:bg-amber-950 dark:text-amber-400";
+  if (total <= 100) return "bg-emerald-50 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-400";
+  return "bg-red-50 text-red-700 dark:bg-red-950 dark:text-red-400";
 }
 
 // Conversion assumes a 5-day (Mon-Fri) work week: weekend days have no
@@ -305,32 +305,32 @@ export default function CalendarPage() {
     <div>
       <div className="mb-6 flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-slate-900">Calendario</h1>
-          <p className="text-sm text-slate-500">
+          <h1 className="text-2xl font-bold text-slate-900 dark:text-slate-100">Calendario</h1>
+          <p className="text-sm text-slate-500 dark:text-slate-400">
             {format(range.start, "d MMM", { locale: it })} – {format(range.end, "d MMM yyyy", { locale: it })}
           </p>
         </div>
         <div className="flex items-center gap-2">
-          <div className="flex rounded-lg border border-slate-200 bg-white p-0.5">
+          <div className="flex rounded-lg border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-800 p-0.5">
             {(["percentage", "hours"] as ViewUnit[]).map((u) => (
               <button
                 key={u}
                 onClick={() => setViewUnit(u)}
                 className={`rounded-md px-3 py-1.5 text-sm font-medium ${
-                  viewUnit === u ? "bg-brand-500 text-white" : "text-slate-600"
+                  viewUnit === u ? "bg-brand-500 text-white" : "text-slate-600 dark:text-slate-300"
                 }`}
               >
                 {u === "percentage" ? "%" : "Ore"}
               </button>
             ))}
           </div>
-          <div className="flex rounded-lg border border-slate-200 bg-white p-0.5">
+          <div className="flex rounded-lg border border-slate-200 bg-white p-0.5 dark:border-slate-600 dark:bg-slate-800">
             {(["week", "month", "year"] as ViewMode[]).map((m) => (
               <button
                 key={m}
                 onClick={() => setView(m)}
                 className={`rounded-md px-3 py-1.5 text-sm font-medium ${
-                  view === m ? "bg-brand-500 text-white" : "text-slate-600"
+                  view === m ? "bg-brand-500 text-white" : "text-slate-600 dark:text-slate-300"
                 }`}
               >
                 {m === "week" ? "Settimana" : m === "month" ? "Mese" : "Anno"}
@@ -352,14 +352,14 @@ export default function CalendarPage() {
       <Card>
         <CardBody className="overflow-x-auto p-0">
           {loading || !snapshot ? (
-            <p className="p-6 text-center text-sm text-slate-400">Caricamento…</p>
+            <p className="p-6 text-center text-sm text-slate-400 dark:text-slate-500">Caricamento…</p>
           ) : snapshot.people.length === 0 ? (
-            <p className="p-6 text-center text-sm text-slate-400">Nessuna persona registrata</p>
+            <p className="p-6 text-center text-sm text-slate-400 dark:text-slate-500">Nessuna persona registrata</p>
           ) : (
             <table className="w-full border-collapse text-sm">
               <thead>
                 <tr>
-                  <th className="sticky left-0 z-10 min-w-[200px] border-b border-r border-slate-100 bg-white px-4 py-3 text-left text-xs uppercase text-slate-500">
+                  <th className="sticky left-0 z-10 min-w-[200px] border-b border-r border-slate-100 dark:border-slate-700 bg-white dark:bg-slate-800 px-4 py-3 text-left text-xs uppercase text-slate-500 dark:text-slate-400">
                     Persona
                   </th>
                   {columns.map((col) => {
@@ -370,15 +370,17 @@ export default function CalendarPage() {
                         className={`${
                           view === "month" ? "min-w-[90px]" : view === "year" ? "min-w-[60px]" : "min-w-[70px]"
                         } border-b px-2 py-3 text-center text-xs font-medium ${
-                          isToday ? "border-brand-300 bg-brand-50 text-brand-700" : "border-slate-100 text-slate-500"
+                          isToday
+                            ? "border-brand-300 bg-brand-50 text-brand-700 dark:border-brand-500 dark:bg-brand-500/10 dark:text-brand-400"
+                            : "border-slate-100 text-slate-500 dark:border-slate-700 dark:text-slate-400"
                         }`}
                       >
                         <div className={isToday ? "font-semibold" : ""}>{col.label1}</div>
-                        <div className={isToday ? "text-brand-500" : "text-slate-400"}>{col.label2}</div>
+                        <div className={isToday ? "text-brand-500 dark:text-brand-400" : "text-slate-400 dark:text-slate-500"}>{col.label2}</div>
                       </th>
                     );
                   })}
-                  <th className="min-w-[40px] border-b border-slate-100"></th>
+                  <th className="min-w-[40px] border-b border-slate-100 dark:border-slate-700"></th>
                 </tr>
               </thead>
               <tbody>
@@ -391,10 +393,10 @@ export default function CalendarPage() {
                   const projectRows = buildProjectRows(visibleRows, columns);
                   return (
                     <Fragment key={person.personId}>
-                      <tr className="border-b border-slate-50">
-                        <td className="sticky left-0 z-10 border-r border-slate-100 bg-white px-4 py-2 font-medium text-slate-700">
+                      <tr className="border-b border-slate-50 dark:border-slate-700">
+                        <td className="sticky left-0 z-10 border-r border-slate-100 dark:border-slate-700 bg-white dark:bg-slate-800 px-4 py-2 font-medium text-slate-700 dark:text-slate-200">
                           <button
-                            className="mr-2 inline-flex h-5 w-5 items-center justify-center rounded border border-slate-200 text-xs text-slate-500 hover:bg-slate-50"
+                            className="mr-2 inline-flex h-5 w-5 items-center justify-center rounded border border-slate-200 dark:border-slate-600 text-xs text-slate-500 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-700"
                             onClick={() => toggleExpand(person.personId)}
                             title={isExpanded ? "Comprimi" : "Espandi assegnazioni"}
                           >
@@ -413,7 +415,7 @@ export default function CalendarPage() {
                                 : "—"
                               : pctToHoursLabel(total, person.capacityHoursPerWeek, col.weekend);
                           return (
-                            <td key={col.key} className={`p-1 text-center ${isToday ? "bg-brand-50/40" : ""}`}>
+                            <td key={col.key} className={`p-1 text-center ${isToday ? "bg-brand-50/40 dark:bg-brand-500/10" : ""}`}>
                               <button
                                 onClick={() =>
                                   setEditCell({
@@ -434,12 +436,12 @@ export default function CalendarPage() {
                             </td>
                           );
                         })}
-                        <td className="border-b border-slate-50 bg-white"></td>
+                        <td className="border-b border-slate-50 bg-white dark:border-slate-700 dark:bg-slate-800"></td>
                       </tr>
 
                       {isExpanded && loadingRows[person.personId] && (
                         <tr key={`${person.personId}-loading`}>
-                          <td colSpan={columns.length + 2} className="bg-slate-50/40 px-4 py-2 text-xs text-slate-400">
+                          <td colSpan={columns.length + 2} className="bg-slate-50/40 px-4 py-2 text-xs text-slate-400 dark:bg-slate-700/30 dark:text-slate-500">
                             Caricamento assegnazioni…
                           </td>
                         </tr>
@@ -450,8 +452,8 @@ export default function CalendarPage() {
                         projectRows.map((g) => {
                           return (
                             <Fragment key={g.key}>
-                              <tr className="border-b border-slate-50 bg-slate-50/40">
-                                <td className="sticky left-0 z-10 border-r border-slate-100 bg-slate-50/40 px-4 py-1.5 pl-9 text-xs text-slate-600">
+                              <tr className="border-b border-slate-50 bg-slate-50/40 dark:border-slate-700 dark:bg-slate-700/30">
+                                <td className="sticky left-0 z-10 border-r border-slate-100 dark:border-slate-700 bg-slate-50/40 dark:bg-slate-700/30 px-4 py-1.5 pl-9 text-xs text-slate-600 dark:text-slate-300">
                                   <span
                                     className="mr-1.5 inline-block h-2 w-2 rounded-full align-middle"
                                     style={{ backgroundColor: g.projectColor }}
@@ -459,7 +461,7 @@ export default function CalendarPage() {
                                   <select
                                     value={g.projectId}
                                     title="Cambia progetto (percentuali e date restano invariate)"
-                                    className="rounded border-none bg-transparent py-0.5 text-xs text-slate-600 hover:bg-slate-100 focus:outline-none focus:ring-1 focus:ring-brand-400"
+                                    className="rounded border-none bg-transparent py-0.5 text-xs text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700 focus:outline-none focus:ring-1 focus:ring-brand-400"
                                     onChange={(e) =>
                                       handleChangeRowProject(g.assignmentIds, person.personId, Number(e.target.value))
                                     }
@@ -479,7 +481,7 @@ export default function CalendarPage() {
                                     return (
                                       <td
                                         key={col.key}
-                                        className={`p-1 text-center text-xs text-slate-300 ${isToday ? "bg-brand-50/40" : ""}`}
+                                        className={`p-1 text-center text-xs text-slate-300 dark:text-slate-600 ${isToday ? "bg-brand-50/40 dark:bg-brand-500/10" : ""}`}
                                         title="Passa alla vista % per modificare i weekend"
                                       >
                                         —
@@ -494,14 +496,14 @@ export default function CalendarPage() {
                                       ? pct
                                       : Math.round(dailyCapacity(person.capacityHoursPerWeek) * (pct / 100) * 10) / 10;
                                   return (
-                                    <td key={col.key} className={`p-1 ${isToday ? "bg-brand-50/40" : ""}`}>
+                                    <td key={col.key} className={`p-1 ${isToday ? "bg-brand-50/40 dark:bg-brand-500/10" : ""}`}>
                                       <input
                                         type="number"
                                         defaultValue={displayValue}
                                         placeholder="—"
                                         key={`${g.key}-${col.key}-${displayValue}-${viewUnit}`}
-                                        className={`h-8 w-full rounded border text-center text-xs placeholder:text-slate-300 focus:border-brand-400 focus:outline-none ${
-                                          isToday ? "border-brand-300" : "border-slate-200"
+                                        className={`h-8 w-full rounded border bg-white dark:bg-slate-900 text-center text-xs text-slate-900 dark:text-slate-100 placeholder:text-slate-300 dark:placeholder:text-slate-600 focus:border-brand-400 focus:outline-none ${
+                                          isToday ? "border-brand-300 dark:border-brand-500" : "border-slate-200 dark:border-slate-600"
                                         }`}
                                         onBlur={(e) => {
                                           const raw = e.target.value.trim();
@@ -519,7 +521,7 @@ export default function CalendarPage() {
                                 })}
                                 <td className="p-1 text-center">
                                   <button
-                                    className="inline-flex h-7 w-7 items-center justify-center rounded text-slate-400 hover:bg-red-50 hover:text-red-600"
+                                    className="inline-flex h-7 w-7 items-center justify-center rounded text-slate-400 dark:text-slate-500 hover:bg-red-50 hover:text-red-600 dark:hover:bg-red-950 dark:hover:text-red-400"
                                     title="Rimuovi assegnazione"
                                     onClick={() => handleDeleteGroup(g.assignmentIds, person.personId)}
                                   >
@@ -532,11 +534,11 @@ export default function CalendarPage() {
                         })}
 
                       {isExpanded && !loadingRows[person.personId] && (
-                        <tr key={`${person.personId}-add`} className="border-b border-slate-100 bg-slate-50/40">
+                        <tr key={`${person.personId}-add`} className="border-b border-slate-100 bg-slate-50/40 dark:border-slate-700 dark:bg-slate-700/30">
                           <td colSpan={columns.length + 2} className="p-0">
                             <div className="sticky left-0 w-fit px-4 py-1.5 pl-9">
                               <button
-                                className="text-xs font-medium text-brand-600 hover:underline"
+                                className="text-xs font-medium text-brand-600 dark:text-brand-400 hover:underline"
                                 onClick={() => setAddFor({ id: person.personId, name: person.personName })}
                               >
                                 + Nuova assegnazione
@@ -554,11 +556,11 @@ export default function CalendarPage() {
         </CardBody>
       </Card>
 
-      <div className="mt-4 flex items-center gap-4 text-xs text-slate-500">
-        <LegendDot className="bg-slate-50" label="0%" />
-        <LegendDot className="bg-amber-50" label="< 70% (sotto-allocato)" />
-        <LegendDot className="bg-emerald-50" label="70–100%" />
-        <LegendDot className="bg-red-50" label="> 100% (sovra-allocato)" />
+      <div className="mt-4 flex items-center gap-4 text-xs text-slate-500 dark:text-slate-400">
+        <LegendDot className="bg-slate-50 dark:bg-slate-700/40" label="0%" />
+        <LegendDot className="bg-amber-50 dark:bg-amber-950" label="< 70% (sotto-allocato)" />
+        <LegendDot className="bg-emerald-50 dark:bg-emerald-950" label="70–100%" />
+        <LegendDot className="bg-red-50 dark:bg-red-950" label="> 100% (sovra-allocato)" />
       </div>
 
       {editCell && (
@@ -598,7 +600,7 @@ export default function CalendarPage() {
 function LegendDot({ className, label }: { className: string; label: string }) {
   return (
     <div className="flex items-center gap-1.5">
-      <span className={`h-3 w-3 rounded ${className} border border-slate-200`} />
+      <span className={`h-3 w-3 rounded ${className} border border-slate-200 dark:border-slate-600`} />
       {label}
     </div>
   );
@@ -675,10 +677,10 @@ function EditCellModal({
   return (
     <Modal open onClose={onClose} title={`${cell.personName} · ${periodLabel}`}>
       {loading ? (
-        <p className="text-sm text-slate-400">Caricamento…</p>
+        <p className="text-sm text-slate-400 dark:text-slate-500">Caricamento…</p>
       ) : assignments.length === 0 ? (
         <div>
-          <p className="mb-3 text-sm text-slate-400">
+          <p className="mb-3 text-sm text-slate-400 dark:text-slate-500">
             {cell.unit === "month"
               ? "Nessuna assegnazione attiva in questo mese."
               : cell.unit === "week"
@@ -694,7 +696,7 @@ function EditCellModal({
         </div>
       ) : (
         <div>
-          <p className="mb-3 text-xs text-slate-500">
+          <p className="mb-3 text-xs text-slate-500 dark:text-slate-400">
             {cell.unit === "month"
               ? "Modifica la percentuale per questo mese soltanto — l'assegnazione verrà divisa automaticamente."
               : cell.unit === "week"
@@ -711,7 +713,7 @@ function EditCellModal({
                 onChange={(e) => setEdits((prev) => ({ ...prev, [a.id]: Number(e.target.value) }))}
               />
               {viewUnit === "hours" && (
-                <p className="mt-1 text-xs text-slate-400">
+                <p className="mt-1 text-xs text-slate-400 dark:text-slate-500">
                   ≈ {((edits[a.id] ?? a.percentage) / 100).toFixed(2)} × capacità giornaliera
                 </p>
               )}

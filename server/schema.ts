@@ -7,6 +7,7 @@ import {
   varchar,
   date,
   real,
+  boolean,
   pgEnum,
 } from "drizzle-orm/pg-core";
 
@@ -30,6 +31,7 @@ export const users = pgTable("users", {
   email: varchar("email", { length: 255 }).notNull().unique(),
   passwordHash: text("password_hash").notNull(),
   name: varchar("name", { length: 255 }).notNull(),
+  active: boolean("active").notNull().default(true),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 

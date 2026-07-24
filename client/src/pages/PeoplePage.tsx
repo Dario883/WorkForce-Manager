@@ -1,16 +1,24 @@
 import { useEffect, useRef, useState } from "react";
 import { Link } from "wouter";
+import { format } from "date-fns";
 import { api } from "../lib/api";
-import type { Person } from "@shared/types";
+import type { Person, Settings, StaffingSnapshot } from "@shared/types";
 import { Card, CardBody } from "../components/Card";
 import Button from "../components/Button";
-import Modal from "../components/Modal";
-import { Field, Input } from "../components/ui";
+import { Badge, Input } from "../components/ui";
+import PersonModal from "../components/PersonModal";
 
-const COLORS = ["#3457d5", "#059669", "#d97706", "#dc2626", "#7c3aed", "#0891b2"];
+function allocationTone(pct: number, under: number, over: number) {
+  if (pct === 0) return "#94a3b8";
+  if (pct < under) return "#d97706";
+  if (pct <= over) return "#059669";
+  return "#dc2626";
+}
 
 export default function PeoplePage() {
   const [people, setPeople] = useState<Person[]>([]);
+  const [snapshot, setSnapshot] = useState<StaffingSnapshot | null>(null);
+  const [thresholds, setThresholds] = useState({ under: 70, over: 100 });
   const [loading, setLoading] = useState(true);
   const [modalOpen, setModalOpen] = useState(false);
   const [editing, setEditing] = useState<Person | null>(null);
@@ -25,13 +33,30 @@ export default function PeoplePage() {
 
   function load() {
     setLoading(true);
-    api
-      .get<Person[]>("/people")
-      .then(setPeople)
+    const today = format(new Date(), "yyyy-MM-dd");
+    Promise.all([
+      api.get<Person[]>("/people"),
+      api.get<StaffingSnapshot>(`/staffing/snapshot?from=${today}&to=${today}`),
+      api.get<Settings>("/settings"),
+    ])
+      .then(([p, snap, s]) => {
+        setPeople(p);
+        setSnapshot(snap);
+        setThresholds({
+          under: Number(s.underutilization_threshold ?? 70),
+          over: Number(s.overutilization_threshold ?? 100),
+        });
+      })
       .finally(() => setLoading(false));
   }
 
   useEffect(load, []);
+
+  function allocationFor(personId: number): number {
+    const today = format(new Date(), "yyyy-MM-dd");
+    const person = snapshot?.people.find((p) => p.personId === personId);
+    return person?.days[today]?.total ?? 0;
+  }
 
   async function handleDelete(id: number) {
     if (!confirm("Eliminare questa persona? L'azione non è reversibile.")) return;
@@ -61,8 +86,8 @@ export default function PeoplePage() {
     <div>
       <div className="mb-6 flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-slate-900">Persone</h1>
-          <p className="text-sm text-slate-500">{people.length} risorse totali</p>
+          <h1 className="text-2xl font-bold text-slate-900 dark:text-slate-100">Persone</h1>
+          <p className="text-sm text-slate-500 dark:text-slate-400">{people.length} risorse totali</p>
         </div>
         <div className="flex gap-2">
           <Button variant="secondary" onClick={handleTemplate}>
@@ -98,27 +123,28 @@ export default function PeoplePage() {
       <Card>
         <CardBody className="p-0">
           {loading ? (
-            <p className="p-6 text-center text-sm text-slate-400">Caricamento…</p>
+            <p className="p-6 text-center text-sm text-slate-400 dark:text-slate-500">Caricamento…</p>
           ) : people.length === 0 ? (
-            <p className="p-6 text-center text-sm text-slate-400">Nessuna persona registrata</p>
+            <p className="p-6 text-center text-sm text-slate-400 dark:text-slate-500">Nessuna persona registrata</p>
           ) : filteredPeople.length === 0 ? (
-            <p className="p-6 text-center text-sm text-slate-400">Nessun risultato per la ricerca</p>
+            <p className="p-6 text-center text-sm text-slate-400 dark:text-slate-500">Nessun risultato per la ricerca</p>
           ) : (
             <table className="w-full text-sm">
-              <thead className="border-b border-slate-100 text-left text-xs uppercase text-slate-500">
+              <thead className="border-b border-slate-100 dark:border-slate-700 text-left text-xs uppercase text-slate-500 dark:text-slate-400">
                 <tr>
                   <th className="px-5 py-3">Nome</th>
                   <th className="px-5 py-3">Ruolo</th>
                   <th className="px-5 py-3">Email</th>
                   <th className="px-5 py-3">Capacità (h/sett.)</th>
+                  <th className="px-5 py-3">Allocazione oggi</th>
                   <th className="px-5 py-3"></th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-slate-100">
+              <tbody className="divide-y divide-slate-100 dark:divide-slate-700">
                 {filteredPeople.map((p) => (
-                  <tr key={p.id} className="hover:bg-slate-50">
+                  <tr key={p.id} className="hover:bg-slate-50 dark:hover:bg-slate-700">
                     <td className="px-5 py-3">
-                      <Link href={`/people/${p.id}`} className="flex items-center gap-2 font-medium text-slate-800 hover:text-brand-600">
+                      <Link href={`/people/${p.id}`} className="flex items-center gap-2 font-medium text-slate-800 dark:text-slate-100 hover:text-brand-600 dark:hover:text-brand-400">
                         <span
                           className="grid h-7 w-7 place-items-center rounded-full text-xs font-semibold text-white"
                           style={{ backgroundColor: p.avatarColor }}
@@ -128,12 +154,17 @@ export default function PeoplePage() {
                         {p.name}
                       </Link>
                     </td>
-                    <td className="px-5 py-3 text-slate-600">{p.role || "—"}</td>
-                    <td className="px-5 py-3 text-slate-600">{p.email || "—"}</td>
-                    <td className="px-5 py-3 text-slate-600">{p.capacityHoursPerWeek}h</td>
+                    <td className="px-5 py-3 text-slate-600 dark:text-slate-300">{p.role || "—"}</td>
+                    <td className="px-5 py-3 text-slate-600 dark:text-slate-300">{p.email || "—"}</td>
+                    <td className="px-5 py-3 text-slate-600 dark:text-slate-300">{p.capacityHoursPerWeek}h</td>
+                    <td className="px-5 py-3">
+                      <Badge color={allocationTone(allocationFor(p.id), thresholds.under, thresholds.over)}>
+                        {allocationFor(p.id)}%
+                      </Badge>
+                    </td>
                     <td className="px-5 py-3 text-right">
                       <button
-                        className="mr-3 text-slate-500 hover:text-brand-600"
+                        className="mr-3 text-slate-500 dark:text-slate-400 hover:text-brand-600 dark:hover:text-brand-400"
                         onClick={() => {
                           setEditing(p);
                           setModalOpen(true);
@@ -141,7 +172,7 @@ export default function PeoplePage() {
                       >
                         Modifica
                       </button>
-                      <button className="text-slate-500 hover:text-red-600" onClick={() => handleDelete(p.id)}>
+                      <button className="text-slate-500 dark:text-slate-400 hover:text-red-600 dark:hover:text-red-400" onClick={() => handleDelete(p.id)}>
                         Elimina
                       </button>
                     </td>
@@ -163,109 +194,5 @@ export default function PeoplePage() {
         }}
       />
     </div>
-  );
-}
-
-function PersonModal({
-  open,
-  onClose,
-  person,
-  onSaved,
-}: {
-  open: boolean;
-  onClose: () => void;
-  person: Person | null;
-  onSaved: () => void;
-}) {
-  const [name, setName] = useState("");
-  const [email, setEmail] = useState("");
-  const [role, setRole] = useState("");
-  const [capacity, setCapacity] = useState(40);
-  const [color, setColor] = useState(COLORS[0]);
-  const [saving, setSaving] = useState(false);
-
-  useEffect(() => {
-    if (person) {
-      setName(person.name);
-      setEmail(person.email ?? "");
-      setRole(person.role ?? "");
-      setCapacity(person.capacityHoursPerWeek);
-      setColor(person.avatarColor);
-    } else {
-      setName("");
-      setEmail("");
-      setRole("");
-      setCapacity(40);
-      setColor(COLORS[Math.floor(Math.random() * COLORS.length)]);
-    }
-  }, [person, open]);
-
-  async function handleSubmit(e: React.FormEvent) {
-    e.preventDefault();
-    setSaving(true);
-    const payload = {
-      name,
-      email: email || null,
-      role: role || null,
-      capacityHoursPerWeek: capacity,
-      avatarColor: color,
-    };
-    try {
-      if (person) {
-        await api.put(`/people/${person.id}`, payload);
-      } else {
-        await api.post("/people", payload);
-      }
-      onSaved();
-    } finally {
-      setSaving(false);
-    }
-  }
-
-  return (
-    <Modal open={open} onClose={onClose} title={person ? "Modifica persona" : "Nuova persona"}>
-      <form onSubmit={handleSubmit}>
-        <Field label="Nome">
-          <Input required value={name} onChange={(e) => setName(e.target.value)} />
-        </Field>
-        <Field label="Ruolo">
-          <Input value={role} onChange={(e) => setRole(e.target.value)} placeholder="es. Developer" />
-        </Field>
-        <Field label="Email">
-          <Input type="email" value={email} onChange={(e) => setEmail(e.target.value)} />
-        </Field>
-        <Field label="Capacità (ore/settimana)">
-          <Input
-            type="number"
-            min={1}
-            max={80}
-            value={capacity}
-            onChange={(e) => setCapacity(Number(e.target.value))}
-          />
-        </Field>
-        <Field label="Colore">
-          <div className="flex gap-2">
-            {COLORS.map((c) => (
-              <button
-                type="button"
-                key={c}
-                onClick={() => setColor(c)}
-                className={`h-7 w-7 rounded-full ${color === c ? "ring-2 ring-offset-2 ring-brand-500" : ""}`}
-                style={{ backgroundColor: c }}
-              />
-            ))}
-          </div>
-        </Field>
-
-        <div className="mt-4 flex justify-end gap-2">
-          <Button type="button" variant="secondary" onClick={onClose}>
-            Annulla
-          </Button>
-          <Button type="submit" disabled={saving}>
-            {saving ? "Salvataggio…" : "Salva"}
-          </Button>
-        </div>
-      </form>
-    </Modal>
   );
 }

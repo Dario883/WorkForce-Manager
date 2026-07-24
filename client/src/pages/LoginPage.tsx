@@ -33,14 +33,14 @@ export default function LoginPage() {
   }
 
   return (
-    <div className="flex h-screen items-center justify-center bg-slate-50 px-4">
-      <div className="w-full max-w-sm rounded-xl border border-slate-200 bg-white p-8 shadow-sm">
+    <div className="flex h-screen items-center justify-center bg-slate-50 dark:bg-slate-900 px-4">
+      <div className="w-full max-w-sm rounded-xl border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-800 p-8 shadow-sm">
         <div className="mb-6 flex flex-col items-center">
           <div className="mb-3 grid h-12 w-12 place-items-center rounded-xl bg-brand-500 text-lg font-bold text-white">
             WF
           </div>
-          <h1 className="text-lg font-semibold text-slate-900">WorkForce Manager</h1>
-          <p className="text-sm text-slate-500">Accedi al tuo account</p>
+          <h1 className="text-lg font-semibold text-slate-900 dark:text-slate-100">WorkForce Manager</h1>
+          <p className="text-sm text-slate-500 dark:text-slate-400">Accedi al tuo account</p>
         </div>
 
         <form onSubmit={handleSubmit}>
@@ -63,7 +63,7 @@ export default function LoginPage() {
             />
           </Field>
 
-          {error && <p className="mb-3 text-sm text-red-600">{error}</p>}
+          {error && <p className="mb-3 text-sm text-red-600 dark:text-red-400">{error}</p>}
 
           <Button type="submit" className="w-full" disabled={loading}>
             {loading ? "Accesso in corso…" : "Accedi"}

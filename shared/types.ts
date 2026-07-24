@@ -63,6 +63,14 @@ export interface AuthUser {
   name: string;
 }
 
+export interface AppUser {
+  id: number;
+  email: string;
+  name: string;
+  active: boolean;
+  createdAt: string;
+}
+
 export interface Settings {
   underutilization_threshold: string;
   overutilization_threshold: string;
