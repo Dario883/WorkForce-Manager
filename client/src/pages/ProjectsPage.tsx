@@ -27,7 +27,14 @@ export default function ProjectsPage() {
   const [loading, setLoading] = useState(true);
   const [modalOpen, setModalOpen] = useState(false);
   const [editing, setEditing] = useState<Project | null>(null);
+  const [search, setSearch] = useState("");
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const filteredProjects = projects.filter((p) => {
+    const q = search.trim().toLowerCase();
+    if (!q) return true;
+    return p.name.toLowerCase().includes(q) || (p.client ?? "").toLowerCase().includes(q);
+  });
 
   function load() {
     setLoading(true);
@@ -85,12 +92,23 @@ export default function ProjectsPage() {
         </div>
       </div>
 
+      <div className="mb-4">
+        <Input
+          type="text"
+          placeholder="Cerca per nome o cliente…"
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+        />
+      </div>
+
       <Card>
         <CardBody className="p-0">
           {loading ? (
             <p className="p-6 text-center text-sm text-slate-400">Caricamento…</p>
           ) : projects.length === 0 ? (
             <p className="p-6 text-center text-sm text-slate-400">Nessun progetto registrato</p>
+          ) : filteredProjects.length === 0 ? (
+            <p className="p-6 text-center text-sm text-slate-400">Nessun risultato per la ricerca</p>
           ) : (
             <table className="w-full text-sm">
               <thead className="border-b border-slate-100 text-left text-xs uppercase text-slate-500">
@@ -103,7 +121,7 @@ export default function ProjectsPage() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
-                {projects.map((p) => (
+                {filteredProjects.map((p) => (
                   <tr key={p.id} className="hover:bg-slate-50">
                     <td className="px-5 py-3 font-medium text-slate-800">
                       <span className="mr-2 inline-block h-2.5 w-2.5 rounded-full" style={{ backgroundColor: p.color }} />
