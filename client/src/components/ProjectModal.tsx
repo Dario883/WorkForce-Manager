@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { api, ApiError } from "../lib/api";
-import type { Project, ProjectStatus } from "@shared/types";
+import type { DeliveryType, Project, ProjectStatus } from "@shared/types";
 import Button from "./Button";
 import Modal from "./Modal";
 import { Field, Input, Select } from "./ui";
@@ -21,6 +21,22 @@ export const STATUS_COLOR: Record<ProjectStatus, string> = {
   completed: "#3457d5",
 };
 
+export const DELIVERY_TYPES: DeliveryType[] = ["TK", "T&M", "TaaS", "AMS"];
+
+export const DELIVERY_LABEL: Record<DeliveryType, string> = {
+  TK: "Turnkey (chiavi in mano)",
+  "T&M": "Time & Material",
+  TaaS: "Team as a Service",
+  AMS: "Application Management Services",
+};
+
+export const DELIVERY_COLOR: Record<DeliveryType, string> = {
+  TK: "#0891b2",
+  "T&M": "#3457d5",
+  TaaS: "#7c3aed",
+  AMS: "#d97706",
+};
+
 export default function ProjectModal({
   open,
   onClose,
@@ -35,6 +51,7 @@ export default function ProjectModal({
   const [name, setName] = useState("");
   const [client, setClient] = useState("");
   const [status, setStatus] = useState<ProjectStatus>("planned");
+  const [deliveryType, setDeliveryType] = useState<DeliveryType>("T&M");
   const [color, setColor] = useState(COLORS[0]);
   const [startDate, setStartDate] = useState("");
   const [endDate, setEndDate] = useState("");
@@ -45,6 +62,7 @@ export default function ProjectModal({
       setName(project.name);
       setClient(project.client ?? "");
       setStatus(project.status);
+      setDeliveryType(project.deliveryType);
       setColor(project.color);
       setStartDate(project.startDate ?? "");
       setEndDate(project.endDate ?? "");
@@ -52,6 +70,7 @@ export default function ProjectModal({
       setName("");
       setClient("");
       setStatus("planned");
+      setDeliveryType("T&M");
       setColor(COLORS[Math.floor(Math.random() * COLORS.length)]);
       setStartDate("");
       setEndDate("");
@@ -65,6 +84,7 @@ export default function ProjectModal({
       name,
       client: client || null,
       status,
+      deliveryType,
       color,
       startDate: startDate || null,
       endDate: endDate || null,
@@ -99,15 +119,26 @@ export default function ProjectModal({
         <Field label="Cliente">
           <Input value={client} onChange={(e) => setClient(e.target.value)} />
         </Field>
-        <Field label="Stato">
-          <Select value={status} onChange={(e) => setStatus(e.target.value as ProjectStatus)}>
-            {Object.entries(STATUS_LABEL).map(([value, label]) => (
-              <option key={value} value={value}>
-                {label}
-              </option>
-            ))}
-          </Select>
-        </Field>
+        <div className="grid grid-cols-2 gap-3">
+          <Field label="Stato">
+            <Select value={status} onChange={(e) => setStatus(e.target.value as ProjectStatus)}>
+              {Object.entries(STATUS_LABEL).map(([value, label]) => (
+                <option key={value} value={value}>
+                  {label}
+                </option>
+              ))}
+            </Select>
+          </Field>
+          <Field label="Tipo di delivery">
+            <Select value={deliveryType} onChange={(e) => setDeliveryType(e.target.value as DeliveryType)}>
+              {DELIVERY_TYPES.map((value) => (
+                <option key={value} value={value}>
+                  {value} — {DELIVERY_LABEL[value]}
+                </option>
+              ))}
+            </Select>
+          </Field>
+        </div>
         <div className="grid grid-cols-2 gap-3">
           <Field label="Data inizio">
             <Input type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} />

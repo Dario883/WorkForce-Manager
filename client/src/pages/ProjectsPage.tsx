@@ -1,11 +1,11 @@
 import { useEffect, useRef, useState } from "react";
 import { Link } from "wouter";
 import { api } from "../lib/api";
-import type { Project, ProjectStatus } from "@shared/types";
+import type { DeliveryType, Project, ProjectStatus } from "@shared/types";
 import { Card, CardBody } from "../components/Card";
 import Button from "../components/Button";
-import { Badge, Input } from "../components/ui";
-import ProjectModal, { STATUS_COLOR, STATUS_LABEL } from "../components/ProjectModal";
+import { Badge, Input, Select } from "../components/ui";
+import ProjectModal, { DELIVERY_COLOR, DELIVERY_LABEL, DELIVERY_TYPES, STATUS_COLOR, STATUS_LABEL } from "../components/ProjectModal";
 
 const STATUS_FILTERS: (ProjectStatus | "all")[] = ["all", "planned", "active", "on_hold", "completed"];
 
@@ -16,10 +16,12 @@ export default function ProjectsPage() {
   const [editing, setEditing] = useState<Project | null>(null);
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<ProjectStatus | "all">("all");
+  const [deliveryFilter, setDeliveryFilter] = useState<DeliveryType | "all">("all");
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const filteredProjects = projects.filter((p) => {
     if (statusFilter !== "all" && p.status !== statusFilter) return false;
+    if (deliveryFilter !== "all" && p.deliveryType !== deliveryFilter) return false;
     const q = search.trim().toLowerCase();
     if (!q) return true;
     return (
@@ -107,6 +109,14 @@ export default function ProjectsPage() {
             </button>
           ))}
         </div>
+        <Select value={deliveryFilter} onChange={(e) => setDeliveryFilter(e.target.value as DeliveryType | "all")} className="sm:w-48">
+          <option value="all">Tutti i tipi delivery</option>
+          {DELIVERY_TYPES.map((d) => (
+            <option key={d} value={d}>
+              {d} — {DELIVERY_LABEL[d]}
+            </option>
+          ))}
+        </Select>
       </div>
 
       <Card>
@@ -125,6 +135,7 @@ export default function ProjectsPage() {
                   <th className="px-5 py-3">Progetto</th>
                   <th className="px-5 py-3">Cliente</th>
                   <th className="px-5 py-3">Stato</th>
+                  <th className="px-5 py-3">Delivery</th>
                   <th className="px-5 py-3">Periodo</th>
                   <th className="px-5 py-3"></th>
                 </tr>
@@ -145,6 +156,9 @@ export default function ProjectsPage() {
                     <td className="px-5 py-3 text-slate-600 dark:text-slate-300">{p.client || "—"}</td>
                     <td className="px-5 py-3">
                       <Badge color={STATUS_COLOR[p.status]}>{STATUS_LABEL[p.status]}</Badge>
+                    </td>
+                    <td className="px-5 py-3">
+                      <Badge color={DELIVERY_COLOR[p.deliveryType]}>{p.deliveryType}</Badge>
                     </td>
                     <td className="px-5 py-3 text-slate-600 dark:text-slate-300">
                       {p.startDate ?? "—"} → {p.endDate ?? "—"}

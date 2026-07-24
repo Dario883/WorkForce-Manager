@@ -1,5 +1,7 @@
 export type ProjectStatus = "planned" | "active" | "on_hold" | "completed";
 export type PeriodType = "day" | "week" | "month" | "year";
+export type DeliveryType = "TK" | "T&M" | "TaaS" | "AMS";
+export type AbsenceType = "ferie" | "malattia" | "permesso" | "formazione" | "altro";
 
 export interface Person {
   id: number;
@@ -18,11 +20,33 @@ export interface Project {
   name: string;
   client: string | null;
   status: ProjectStatus;
+  deliveryType: DeliveryType;
   color: string;
   startDate: string | null;
   endDate: string | null;
   createdAt: string;
   updatedAt: string;
+}
+
+export interface Absence {
+  id: number;
+  personId: number;
+  personName?: string;
+  type: AbsenceType;
+  startDate: string;
+  endDate: string;
+  notes: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface CapacityPeriod {
+  id: number;
+  personId: number;
+  startDate: string;
+  endDate: string | null;
+  hoursPerWeek: number;
+  createdAt: string;
 }
 
 export interface Assignment {
@@ -40,6 +64,7 @@ export interface Assignment {
 
 export interface StaffingDay {
   total: number;
+  capacityHoursPerWeek: number;
   items: { projectName: string; projectColor: string; percentage: number }[];
 }
 

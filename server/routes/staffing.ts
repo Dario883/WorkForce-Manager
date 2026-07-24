@@ -1,10 +1,21 @@
 import { Router } from "express";
 import { z } from "zod";
 import { db } from "../db";
-import { assignments, people, projects } from "../schema";
+import { assignments, people, personCapacityPeriods, projects } from "../schema";
 import { eq } from "drizzle-orm";
 import { eachDayOfInterval, format } from "date-fns";
 import { asyncHandler } from "../asyncHandler";
+
+/** Resolves a person's effective hours/week on a given day: the capacity
+ * period covering that date, if any, otherwise the person's base value. */
+function resolveCapacity(
+  periods: { startDate: string; endDate: string | null; hoursPerWeek: number }[],
+  base: number,
+  day: string
+): number {
+  const match = periods.find((p) => p.startDate <= day && (p.endDate === null || p.endDate >= day));
+  return match ? match.hoursPerWeek : base;
+}
 
 export const staffingRouter = Router();
 
@@ -27,6 +38,7 @@ staffingRouter.get("/snapshot", asyncHandler(async (req, res) => {
   const to = new Date(parsed.data.to);
 
   const allPeople = await db.select().from(people);
+  const allCapacityPeriods = await db.select().from(personCapacityPeriods);
   const allAssignments = await db
     .select({
       id: assignments.id,
@@ -46,9 +58,14 @@ staffingRouter.get("/snapshot", asyncHandler(async (req, res) => {
 
   const byPerson = allPeople.map((person) => {
     const personAssignments = allAssignments.filter((a) => a.personId === person.id);
+    const personCapacityPeriodsForPerson = allCapacityPeriods.filter((c) => c.personId === person.id);
     const dayMap: Record<
       string,
-      { total: number; items: { projectName: string; projectColor: string; percentage: number }[] }
+      {
+        total: number;
+        capacityHoursPerWeek: number;
+        items: { projectName: string; projectColor: string; percentage: number }[];
+      }
     > = {};
 
     for (const day of days) {
@@ -60,6 +77,7 @@ staffingRouter.get("/snapshot", asyncHandler(async (req, res) => {
       });
       dayMap[day] = {
         total: active.reduce((sum, a) => sum + a.percentage, 0),
+        capacityHoursPerWeek: resolveCapacity(personCapacityPeriodsForPerson, person.capacityHoursPerWeek, day),
         items: active.map((a) => ({
           projectName: a.projectName,
           projectColor: a.projectColor,

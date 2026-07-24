@@ -4,7 +4,8 @@ import { api } from "../lib/api";
 import Button from "../components/Button";
 import { Card, CardBody, CardHeader } from "../components/Card";
 import { Badge } from "../components/ui";
-import type { Assignment, Person, Project, ProjectStatus, Settings, StaffingSnapshot } from "@shared/types";
+import type { Absence, Assignment, DeliveryType, Person, Project, ProjectStatus, Settings, StaffingSnapshot } from "@shared/types";
+import { DELIVERY_COLOR, DELIVERY_LABEL } from "../components/ProjectModal";
 import {
   addDays,
   addMonths,
@@ -26,7 +27,10 @@ import { it } from "date-fns/locale";
 
 type PeriodView = "week" | "month" | "year";
 const UPCOMING_DEADLINE_DAYS = 14;
+const UPCOMING_START_DAYS = 14;
 const METER_MAX = 150;
+const DELIVERY_ORDER: DeliveryType[] = ["TK", "T&M", "TaaS", "AMS"];
+const STANDARD_FTE_HOURS = 40;
 
 // Same mapping already used for status badges in ProjectsPage — reused here
 // for consistency rather than introducing a second palette for the same data.
@@ -52,6 +56,7 @@ export default function DashboardPage() {
   const [snapshot, setSnapshot] = useState<StaffingSnapshot | null>(null);
   const [prevSnapshot, setPrevSnapshot] = useState<StaffingSnapshot | null>(null);
   const [periodAssignments, setPeriodAssignments] = useState<Assignment[]>([]);
+  const [periodAbsences, setPeriodAbsences] = useState<Absence[]>([]);
   const [settings, setSettings] = useState<Settings | null>(null);
   const [loading, setLoading] = useState(true);
 
@@ -90,11 +95,13 @@ export default function DashboardPage() {
       api.get<StaffingSnapshot>(`/staffing/snapshot?from=${from}&to=${to}`),
       api.get<Assignment[]>("/assignments"),
       api.get<StaffingSnapshot>(`/staffing/snapshot?from=${prevFrom}&to=${prevTo}`),
+      api.get<Absence[]>("/absences"),
     ])
-      .then(([snap, assignments, prevSnap]) => {
+      .then(([snap, assignments, prevSnap, absences]) => {
         setSnapshot(snap);
         setPeriodAssignments(assignments.filter((a) => a.endDate >= from && a.startDate <= to));
         setPrevSnapshot(prevSnap);
+        setPeriodAbsences(absences.filter((a) => a.endDate >= from && a.startDate <= to));
       })
       .finally(() => setLoading(false));
   }, [view, anchor.toDateString()]);
@@ -108,9 +115,12 @@ export default function DashboardPage() {
 
   const avgPerPerson =
     snapshot?.people.map((p) => {
-      const values = Object.values(p.days).map((d) => d.total);
-      const avg = values.length ? values.reduce((a, b) => a + b, 0) / values.length : 0;
-      return { ...p, avg };
+      const dayValues = Object.values(p.days);
+      const avg = dayValues.length ? dayValues.reduce((a, d) => a + d.total, 0) / dayValues.length : 0;
+      const avgCapacity = dayValues.length
+        ? dayValues.reduce((a, d) => a + d.capacityHoursPerWeek, 0) / dayValues.length
+        : p.capacityHoursPerWeek;
+      return { ...p, avg, avgCapacity };
     }) ?? [];
 
   const underAllocated = avgPerPerson.filter((p) => p.avg < underThreshold);
@@ -127,18 +137,73 @@ export default function DashboardPage() {
   const teamAvgDelta = teamAvg - prevTeamAvg;
 
   const deadlineCutoff = format(addDays(new Date(), UPCOMING_DEADLINE_DAYS), "yyyy-MM-dd");
+  const startingCutoff = format(addDays(new Date(), UPCOMING_START_DAYS), "yyyy-MM-dd");
   const todayStr = format(new Date(), "yyyy-MM-dd");
   const projectsNearingDeadline = activeProjects.filter(
     (p) => p.endDate && p.endDate >= todayStr && p.endDate <= deadlineCutoff
+  );
+  const projectsStartingSoon = projects.filter(
+    (p) => p.status !== "completed" && p.startDate && p.startDate >= todayStr && p.startDate <= startingCutoff
   );
 
   const staffedProjectIds = new Set(periodAssignments.map((a) => a.projectId));
   const projectsWithoutResources = activeProjects.filter((p) => !staffedProjectIds.has(p.id));
 
-  const periodWeeks = (differenceInCalendarDays(range.end, range.start) + 1) / 7;
+  const periodDays = differenceInCalendarDays(range.end, range.start) + 1;
+  const periodWeeks = periodDays / 7;
   const freeHoursTotal = Math.round(
-    avgPerPerson.reduce((sum, p) => sum + p.capacityHoursPerWeek * periodWeeks * Math.max(0, 1 - p.avg / 100), 0)
+    avgPerPerson.reduce((sum, p) => sum + p.avgCapacity * periodWeeks * Math.max(0, 1 - p.avg / 100), 0)
   );
+
+  // Total team capacity-hours in the period, resolved day-by-day (so variable
+  // capacity periods are reflected instead of a flat capacityHoursPerWeek).
+  const totalTeamCapacityHours = avgPerPerson.reduce((sum, p) => sum + p.avgCapacity * periodWeeks, 0);
+
+  const fteTotal = avgPerPerson.reduce((sum, p) => sum + p.avgCapacity / STANDARD_FTE_HOURS, 0);
+  const fteAllocated = avgPerPerson.reduce(
+    (sum, p) => sum + (p.avgCapacity / STANDARD_FTE_HOURS) * (p.avg / 100),
+    0
+  );
+
+  // Hours allocated per project (keyed by name, which is unique) in the
+  // period, used for the per-project capacity utilization breakdown.
+  const projectHoursMap = new Map<string, { color: string; hours: number }>();
+  for (const p of avgPerPerson) {
+    const dailyRate = p.capacityHoursPerWeek / 7;
+    for (const day of Object.values(p.days)) {
+      for (const item of day.items) {
+        const entry = projectHoursMap.get(item.projectName) ?? { color: item.projectColor, hours: 0 };
+        entry.hours += dailyRate * (item.percentage / 100);
+        projectHoursMap.set(item.projectName, entry);
+      }
+    }
+  }
+  const projectUtilization = [...projectHoursMap.entries()]
+    .map(([projectName, v]) => ({
+      projectName,
+      color: v.color,
+      hours: v.hours,
+      pctOfTeamCapacity: totalTeamCapacityHours > 0 ? (v.hours / totalTeamCapacityHours) * 100 : 0,
+    }))
+    .sort((a, b) => b.hours - a.hours);
+
+  const deliveryTypeCounts = DELIVERY_ORDER.map((type) => ({
+    type,
+    count: projects.filter((p) => p.deliveryType === type).length,
+  }));
+
+  const absenceDaysByPerson = new Map<number, { personName: string; days: number }>();
+  let totalAbsenceDays = 0;
+  for (const a of periodAbsences) {
+    const clippedStart = a.startDate < format(range.start, "yyyy-MM-dd") ? format(range.start, "yyyy-MM-dd") : a.startDate;
+    const clippedEnd = a.endDate > format(range.end, "yyyy-MM-dd") ? format(range.end, "yyyy-MM-dd") : a.endDate;
+    const days = differenceInCalendarDays(new Date(clippedEnd), new Date(clippedStart)) + 1;
+    totalAbsenceDays += days;
+    const entry = absenceDaysByPerson.get(a.personId) ?? { personName: a.personName ?? "—", days: 0 };
+    entry.days += days;
+    absenceDaysByPerson.set(a.personId, entry);
+  }
+  const absenceDaysList = [...absenceDaysByPerson.values()].sort((a, b) => b.days - a.days);
 
   const periodLabel = `${format(range.start, "d MMM", { locale: it })} – ${format(range.end, "d MMM yyyy", {
     locale: it,
@@ -209,6 +274,13 @@ export default function DashboardPage() {
           href="/projects"
         />
         <KpiCard
+          label={`Progetti in partenza (${UPCOMING_START_DAYS}gg)`}
+          value={projectsStartingSoon.length}
+          icon="🚀"
+          tone={projectsStartingSoon.length > 0 ? "warn" : "ok"}
+          href="/projects"
+        />
+        <KpiCard
           label="Progetti senza risorse"
           value={projectsWithoutResources.length}
           icon="🚧"
@@ -221,6 +293,17 @@ export default function DashboardPage() {
           value={`${Math.round(teamAvg)}%`}
           icon="📊"
           trendDelta={teamAvgDelta}
+        />
+        <KpiCard
+          label="FTE allocati / disponibili"
+          value={`${fteAllocated.toFixed(1)} / ${fteTotal.toFixed(1)}`}
+          icon="🧮"
+        />
+        <KpiCard
+          label="Giorni di assenza nel periodo"
+          value={totalAbsenceDays}
+          icon="🌴"
+          href="/absences"
         />
       </div>
 
@@ -295,6 +378,40 @@ export default function DashboardPage() {
 
       <Card className="mt-4">
         <CardHeader>
+          <h2 className="font-semibold text-slate-800 dark:text-slate-100">Utilizzo capacità per progetto</h2>
+          <p className="text-xs text-slate-500 dark:text-slate-400">
+            Quota di capacità totale del team assorbita da ciascun progetto nel periodo
+          </p>
+        </CardHeader>
+        <CardBody className="space-y-3">
+          {projectUtilization.length === 0 ? (
+            <p className="py-4 text-center text-sm text-slate-400 dark:text-slate-500">Nessuna allocazione nel periodo selezionato</p>
+          ) : (
+            projectUtilization.slice(0, 8).map((p) => (
+              <div key={p.projectName} className="px-2 py-1.5">
+                <div className="mb-1 flex items-center justify-between text-sm">
+                  <span className="flex items-center gap-2 text-slate-700 dark:text-slate-200">
+                    <span className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: p.color }} />
+                    {p.projectName}
+                  </span>
+                  <span className="font-semibold text-slate-700 dark:text-slate-200">
+                    {Math.round(p.pctOfTeamCapacity)}% · {Math.round(p.hours)}h
+                  </span>
+                </div>
+                <div className="h-2.5 w-full overflow-hidden rounded-full bg-slate-100 dark:bg-slate-700">
+                  <div
+                    className="h-full rounded-full"
+                    style={{ width: `${Math.min(p.pctOfTeamCapacity, 100)}%`, backgroundColor: p.color }}
+                  />
+                </div>
+              </div>
+            ))
+          )}
+        </CardBody>
+      </Card>
+
+      <Card className="mt-4">
+        <CardHeader>
           <h2 className="font-semibold text-slate-800 dark:text-slate-100">Progetti per stato</h2>
           <p className="text-xs text-slate-500 dark:text-slate-400">{projects.length} progetti totali</p>
         </CardHeader>
@@ -337,6 +454,50 @@ export default function DashboardPage() {
         </CardBody>
       </Card>
 
+      <Card className="mt-4">
+        <CardHeader>
+          <h2 className="font-semibold text-slate-800 dark:text-slate-100">Progetti per tipo di delivery</h2>
+          <p className="text-xs text-slate-500 dark:text-slate-400">TK · T&M · TaaS · AMS</p>
+        </CardHeader>
+        <CardBody>
+          {projects.length === 0 ? (
+            <p className="py-4 text-center text-sm text-slate-400 dark:text-slate-500">Nessun progetto registrato</p>
+          ) : (
+            <>
+              <div className="flex h-6 w-full overflow-hidden rounded-full">
+                {deliveryTypeCounts
+                  .filter((d) => d.count > 0)
+                  .map((d, idx, arr) => {
+                    const widthPct = (d.count / projects.length) * 100;
+                    return (
+                      <div
+                        key={d.type}
+                        className="flex h-full items-center justify-center text-[10px] font-medium text-white"
+                        style={{
+                          width: `${widthPct}%`,
+                          backgroundColor: DELIVERY_COLOR[d.type],
+                          marginRight: idx < arr.length - 1 ? "2px" : 0,
+                        }}
+                        title={`${DELIVERY_LABEL[d.type]}: ${d.count}`}
+                      >
+                        {widthPct >= 12 ? d.count : ""}
+                      </div>
+                    );
+                  })}
+              </div>
+              <div className="mt-3 flex flex-wrap gap-4 text-xs text-slate-500 dark:text-slate-400">
+                {deliveryTypeCounts.map((d) => (
+                  <span key={d.type} className="flex items-center gap-1.5">
+                    <span className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: DELIVERY_COLOR[d.type] }} />
+                    {d.type} ({d.count})
+                  </span>
+                ))}
+              </div>
+            </>
+          )}
+        </CardBody>
+      </Card>
+
       <div className="mt-4 grid grid-cols-1 gap-4 lg:grid-cols-2">
         <Card>
           <CardHeader>
@@ -369,6 +530,42 @@ export default function DashboardPage() {
               <div key={p.id} className="flex items-center justify-between rounded-lg bg-slate-50 dark:bg-slate-700/40 px-3 py-2">
                 <span className="text-sm text-slate-700 dark:text-slate-200">{p.name}</span>
                 <Badge color="#dc2626">{p.client ?? "—"}</Badge>
+              </div>
+            ))}
+          </CardBody>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <h2 className="font-semibold text-slate-800 dark:text-slate-100">Progetti in partenza</h2>
+            <p className="text-xs text-slate-500 dark:text-slate-400">Entro {UPCOMING_START_DAYS} giorni</p>
+          </CardHeader>
+          <CardBody className="space-y-2">
+            {projectsStartingSoon.length === 0 && (
+              <p className="py-4 text-center text-sm text-slate-400 dark:text-slate-500">Nessun progetto in partenza a breve</p>
+            )}
+            {projectsStartingSoon.map((p) => (
+              <div key={p.id} className="flex items-center justify-between rounded-lg bg-slate-50 dark:bg-slate-700/40 px-3 py-2">
+                <span className="text-sm text-slate-700 dark:text-slate-200">{p.name}</span>
+                <Badge color="#059669">{p.startDate}</Badge>
+              </div>
+            ))}
+          </CardBody>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <h2 className="font-semibold text-slate-800 dark:text-slate-100">Assenze nel periodo</h2>
+            <p className="text-xs text-slate-500 dark:text-slate-400">Giorni di ferie/assenza per persona</p>
+          </CardHeader>
+          <CardBody className="space-y-2">
+            {absenceDaysList.length === 0 && (
+              <p className="py-4 text-center text-sm text-slate-400 dark:text-slate-500">Nessuna assenza nel periodo selezionato</p>
+            )}
+            {absenceDaysList.slice(0, 6).map((a) => (
+              <div key={a.personName} className="flex items-center justify-between rounded-lg bg-slate-50 dark:bg-slate-700/40 px-3 py-2">
+                <span className="text-sm text-slate-700 dark:text-slate-200">{a.personName}</span>
+                <Badge color="#0891b2">{a.days} gg</Badge>
               </div>
             ))}
           </CardBody>

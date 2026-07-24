@@ -5,7 +5,7 @@ import { api } from "../lib/api";
 import type { Person, Settings, StaffingSnapshot } from "@shared/types";
 import { Card, CardBody } from "../components/Card";
 import Button from "../components/Button";
-import { Badge, Input } from "../components/ui";
+import { Badge, Input, Select } from "../components/ui";
 import PersonModal from "../components/PersonModal";
 
 function allocationTone(pct: number, under: number, over: number) {
@@ -23,9 +23,13 @@ export default function PeoplePage() {
   const [modalOpen, setModalOpen] = useState(false);
   const [editing, setEditing] = useState<Person | null>(null);
   const [search, setSearch] = useState("");
+  const [roleFilter, setRoleFilter] = useState("");
   const fileInputRef = useRef<HTMLInputElement>(null);
 
+  const roles = [...new Set(people.map((p) => p.role).filter((r): r is string => !!r))].sort();
+
   const filteredPeople = people.filter((p) => {
+    if (roleFilter && p.role !== roleFilter) return false;
     const q = search.trim().toLowerCase();
     if (!q) return true;
     return p.name.toLowerCase().includes(q) || (p.role ?? "").toLowerCase().includes(q);
@@ -111,13 +115,23 @@ export default function PeoplePage() {
         </div>
       </div>
 
-      <div className="mb-4">
-        <Input
-          type="text"
-          placeholder="Cerca per nome o ruolo..."
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-        />
+      <div className="mb-4 flex flex-col gap-3 sm:flex-row">
+        <div className="flex-1">
+          <Input
+            type="text"
+            placeholder="Cerca per nome o ruolo..."
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+          />
+        </div>
+        <Select value={roleFilter} onChange={(e) => setRoleFilter(e.target.value)} className="sm:w-56">
+          <option value="">Tutti i ruoli</option>
+          {roles.map((r) => (
+            <option key={r} value={r}>
+              {r}
+            </option>
+          ))}
+        </Select>
       </div>
 
       <Card>

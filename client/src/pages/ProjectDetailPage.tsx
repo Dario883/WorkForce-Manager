@@ -5,7 +5,7 @@ import type { Assignment, Project } from "@shared/types";
 import { Card, CardBody, CardHeader } from "../components/Card";
 import Button from "../components/Button";
 import { Badge } from "../components/ui";
-import ProjectModal, { STATUS_COLOR, STATUS_LABEL } from "../components/ProjectModal";
+import ProjectModal, { DELIVERY_COLOR, STATUS_COLOR, STATUS_LABEL } from "../components/ProjectModal";
 
 export default function ProjectDetailPage({ id }: { id: number }) {
   const [project, setProject] = useState<Project | null>(null);
@@ -51,11 +51,17 @@ export default function ProjectDetailPage({ id }: { id: number }) {
         </Button>
       </div>
 
-      <div className="mb-6 grid grid-cols-1 gap-4 sm:grid-cols-3">
+      <div className="mb-6 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <Card>
           <CardBody>
             <p className="text-xs text-slate-500 dark:text-slate-400">Stato</p>
             <Badge color={STATUS_COLOR[project.status]}>{STATUS_LABEL[project.status]}</Badge>
+          </CardBody>
+        </Card>
+        <Card>
+          <CardBody>
+            <p className="text-xs text-slate-500 dark:text-slate-400">Tipo di delivery</p>
+            <Badge color={DELIVERY_COLOR[project.deliveryType]}>{project.deliveryType}</Badge>
           </CardBody>
         </Card>
         <Card>

@@ -2,8 +2,8 @@ import { Router } from "express";
 import { z } from "zod";
 import Papa from "papaparse";
 import { db } from "../db";
-import { people, assignments, projects } from "../schema";
-import { eq, asc } from "drizzle-orm";
+import { people, assignments, projects, personCapacityPeriods } from "../schema";
+import { eq, asc, desc } from "drizzle-orm";
 import { asyncHandler } from "../asyncHandler";
 
 export const peopleRouter = Router();
@@ -95,6 +95,42 @@ peopleRouter.get("/:id/assignments", asyncHandler(async (req, res) => {
     .innerJoin(projects, eq(assignments.projectId, projects.id))
     .where(eq(assignments.personId, id));
   res.json(rows);
+}));
+
+const capacityPeriodSchema = z.object({
+  startDate: z.string(),
+  endDate: z.string().optional().nullable(),
+  hoursPerWeek: z.number().positive(),
+});
+
+peopleRouter.get("/:id/capacity", asyncHandler(async (req, res) => {
+  const id = Number(req.params.id);
+  const rows = await db
+    .select()
+    .from(personCapacityPeriods)
+    .where(eq(personCapacityPeriods.personId, id))
+    .orderBy(desc(personCapacityPeriods.startDate));
+  res.json(rows);
+}));
+
+peopleRouter.post("/:id/capacity", asyncHandler(async (req, res) => {
+  const id = Number(req.params.id);
+  const parsed = capacityPeriodSchema.safeParse(req.body);
+  if (!parsed.success) return res.status(400).json({ error: parsed.error.flatten() });
+  if (parsed.data.endDate && parsed.data.endDate < parsed.data.startDate) {
+    return res.status(400).json({ error: "La data di fine non può precedere la data di inizio" });
+  }
+  const [created] = await db
+    .insert(personCapacityPeriods)
+    .values({ ...parsed.data, personId: id })
+    .returning();
+  res.status(201).json(created);
+}));
+
+peopleRouter.delete("/:id/capacity/:capacityId", asyncHandler(async (req, res) => {
+  const capacityId = Number(req.params.capacityId);
+  await db.delete(personCapacityPeriods).where(eq(personCapacityPeriods.id, capacityId));
+  res.status(204).end();
 }));
 
 peopleRouter.post("/", asyncHandler(async (req, res) => {

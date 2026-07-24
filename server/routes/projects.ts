@@ -13,6 +13,7 @@ const projectSchema = z.object({
   name: z.string().min(1),
   client: z.string().optional().nullable(),
   status: z.enum(["planned", "active", "on_hold", "completed"]).default("planned"),
+  deliveryType: z.enum(["TK", "T&M", "TaaS", "AMS"]).default("T&M"),
   color: z.string().default("#3457d5"),
   startDate: z.string().optional().nullable(),
   endDate: z.string().optional().nullable(),
@@ -25,8 +26,8 @@ projectsRouter.get("/", asyncHandler(async (_req, res) => {
 
 projectsRouter.get("/csv-template", (_req, res) => {
   const csv = Papa.unparse({
-    fields: ["name", "client", "status", "startDate", "endDate", "color"],
-    data: [["Migrazione ERP", "Acme Spa", "active", "2026-01-01", "2026-06-30", "#3457d5"]],
+    fields: ["name", "client", "status", "deliveryType", "startDate", "endDate", "color"],
+    data: [["Migrazione ERP", "Acme Spa", "active", "T&M", "2026-01-01", "2026-06-30", "#3457d5"]],
   });
   res.header("Content-Type", "text/csv");
   res.attachment("projects-template.csv");
@@ -41,6 +42,7 @@ projectsRouter.get("/export", asyncHandler(async (_req, res) => {
       name: p.name,
       client: p.client ?? "",
       status: p.status,
+      deliveryType: p.deliveryType,
       startDate: p.startDate ?? "",
       endDate: p.endDate ?? "",
       color: p.color,
@@ -52,11 +54,18 @@ projectsRouter.get("/export", asyncHandler(async (_req, res) => {
 }));
 
 const VALID_STATUSES = ["planned", "active", "on_hold", "completed"];
+const VALID_DELIVERY_TYPES = ["TK", "T&M", "TaaS", "AMS"];
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 
 function parseStatus(raw?: string): string {
   const normalized = raw?.trim().toLowerCase().replace(/[\s-]+/g, "_");
   return normalized && VALID_STATUSES.includes(normalized) ? normalized : "planned";
+}
+
+function parseDeliveryType(raw?: string): string {
+  const value = raw?.trim();
+  const match = VALID_DELIVERY_TYPES.find((v) => v.toLowerCase() === value?.toLowerCase());
+  return match ?? "T&M";
 }
 
 function parseDate(raw?: string): string | null {
@@ -91,6 +100,7 @@ projectsRouter.post("/import", asyncHandler(async (req, res) => {
         name,
         client: row.client?.trim() || null,
         status: parseStatus(row.status) as any,
+        deliveryType: parseDeliveryType(row.deliveryType) as any,
         startDate: parseDate(row.startDate),
         endDate: parseDate(row.endDate),
         color: row.color?.trim() || "#3457d5",

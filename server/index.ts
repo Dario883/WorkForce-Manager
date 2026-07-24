@@ -13,6 +13,7 @@ import { assignmentsRouter } from "./routes/assignments";
 import { staffingRouter } from "./routes/staffing";
 import { settingsRouter } from "./routes/settings";
 import { usersRouter } from "./routes/users";
+import { absencesRouter } from "./routes/absences";
 
 process.on("unhandledRejection", (reason) => {
   console.error("Unhandled promise rejection:", reason);
@@ -35,6 +36,7 @@ app.use("/api/assignments", requireAuth, assignmentsRouter);
 app.use("/api/staffing", requireAuth, staffingRouter);
 app.use("/api/settings", requireAuth, settingsRouter);
 app.use("/api/users", requireAuth, usersRouter);
+app.use("/api/absences", requireAuth, absencesRouter);
 
 if (process.env.NODE_ENV === "production") {
   const publicDir = path.join(__dirname, "public");

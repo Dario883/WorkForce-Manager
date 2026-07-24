@@ -25,6 +25,21 @@ export const assignmentPeriodEnum = pgEnum("assignment_period_type", [
   "year",
 ]);
 
+export const projectDeliveryTypeEnum = pgEnum("project_delivery_type", [
+  "TK",
+  "T&M",
+  "TaaS",
+  "AMS",
+]);
+
+export const absenceTypeEnum = pgEnum("absence_type", [
+  "ferie",
+  "malattia",
+  "permesso",
+  "formazione",
+  "altro",
+]);
+
 // ── Users (auth) ──────────────────────────────────────────────────────────
 export const users = pgTable("users", {
   id: serial("id").primaryKey(),
@@ -54,6 +69,7 @@ export const projects = pgTable("projects", {
   name: varchar("name", { length: 255 }).notNull().unique(),
   client: varchar("client", { length: 255 }),
   status: projectStatusEnum("status").default("planned").notNull(),
+  deliveryType: projectDeliveryTypeEnum("delivery_type").default("T&M").notNull(),
   color: varchar("color", { length: 32 }).default("#3457d5").notNull(),
   startDate: date("start_date"),
   endDate: date("end_date"),
@@ -78,6 +94,34 @@ export const assignments = pgTable("assignments", {
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
 
+// ── Absences (ferie / malattia / permessi) ───────────────────────────────
+export const absences = pgTable("absences", {
+  id: serial("id").primaryKey(),
+  personId: integer("person_id")
+    .references(() => people.id, { onDelete: "cascade" })
+    .notNull(),
+  type: absenceTypeEnum("type").default("ferie").notNull(),
+  startDate: date("start_date").notNull(),
+  endDate: date("end_date").notNull(),
+  notes: text("notes"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+// ── Person capacity periods (capacità variabile nel tempo) ───────────────
+// A person's capacity is normally the flat `people.capacityHoursPerWeek`.
+// A row here overrides it for [startDate, endDate] (endDate null = open-ended).
+export const personCapacityPeriods = pgTable("person_capacity_periods", {
+  id: serial("id").primaryKey(),
+  personId: integer("person_id")
+    .references(() => people.id, { onDelete: "cascade" })
+    .notNull(),
+  startDate: date("start_date").notNull(),
+  endDate: date("end_date"),
+  hoursPerWeek: real("hours_per_week").notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
 // ── Settings (chiave-valore) ──────────────────────────────────────────────
 export const settings = pgTable("settings", {
   key: varchar("key", { length: 128 }).primaryKey(),
@@ -92,3 +136,7 @@ export type Project = typeof projects.$inferSelect;
 export type InsertProject = typeof projects.$inferInsert;
 export type Assignment = typeof assignments.$inferSelect;
 export type InsertAssignment = typeof assignments.$inferInsert;
+export type Absence = typeof absences.$inferSelect;
+export type InsertAbsence = typeof absences.$inferInsert;
+export type CapacityPeriod = typeof personCapacityPeriods.$inferSelect;
+export type InsertCapacityPeriod = typeof personCapacityPeriods.$inferInsert;
