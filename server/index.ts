@@ -15,6 +15,7 @@ import { settingsRouter } from "./routes/settings";
 import { usersRouter } from "./routes/users";
 import { absencesRouter } from "./routes/absences";
 import { holidaysRouter } from "./routes/holidays";
+import { activityRouter } from "./routes/activity";
 
 process.on("unhandledRejection", (reason) => {
   console.error("Unhandled promise rejection:", reason);
@@ -39,6 +40,7 @@ app.use("/api/settings", requireAuth, settingsRouter);
 app.use("/api/users", requireAuth, usersRouter);
 app.use("/api/absences", requireAuth, absencesRouter);
 app.use("/api/holidays", requireAuth, holidaysRouter);
+app.use("/api/activity", requireAuth, activityRouter);
 
 if (process.env.NODE_ENV === "production") {
   const publicDir = path.join(__dirname, "public");

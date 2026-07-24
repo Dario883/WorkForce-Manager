@@ -1,11 +1,12 @@
 import { useEffect, useState } from "react";
 import { api, ApiError } from "../lib/api";
 import { useAuth } from "../lib/auth";
-import type { AppUser, Holiday, Settings } from "@shared/types";
+import type { ActivityLogEntry, AppUser, Holiday, Settings } from "@shared/types";
 import { Card, CardBody, CardHeader } from "../components/Card";
 import Button from "../components/Button";
 import Modal from "../components/Modal";
-import { Badge, Field, Input } from "../components/ui";
+import { Badge, Field, Input, SortableTh } from "../components/ui";
+import { compareValues, useSortable } from "../lib/sort";
 
 export default function SettingsPage() {
   const [settings, setSettings] = useState<Settings | null>(null);
@@ -83,7 +84,99 @@ export default function SettingsPage() {
       <HolidaysSection />
 
       <UsersSection />
+
+      <ActivityLogSection />
     </div>
+  );
+}
+
+const ACTION_LABEL: Record<string, string> = {
+  created: "Creato",
+  updated: "Modificato",
+  deleted: "Eliminato",
+};
+
+const ACTION_COLOR: Record<string, string> = {
+  created: "#059669",
+  updated: "#0891b2",
+  deleted: "#dc2626",
+};
+
+type ActivitySortKey = "createdAt" | "userName" | "action" | "entityType" | "entityName";
+
+function ActivityLogSection() {
+  const [entries, setEntries] = useState<ActivityLogEntry[]>([]);
+  const [loading, setLoading] = useState(true);
+  const { sortKey, sortDir, onSort } = useSortable<ActivitySortKey>("createdAt", "desc");
+
+  useEffect(() => {
+    api
+      .get<ActivityLogEntry[]>("/activity")
+      .then(setEntries)
+      .finally(() => setLoading(false));
+  }, []);
+
+  const sorted = [...entries].sort((a, b) => {
+    const value = (e: ActivityLogEntry): string => {
+      switch (sortKey) {
+        case "userName":
+          return e.userName;
+        case "action":
+          return e.action;
+        case "entityType":
+          return e.entityType;
+        case "entityName":
+          return e.entityName;
+        default:
+          return e.createdAt;
+      }
+    };
+    return compareValues(value(a), value(b), sortDir);
+  });
+
+  return (
+    <Card className="mt-6 max-w-4xl">
+      <CardHeader>
+        <h2 className="font-semibold text-slate-800 dark:text-slate-100">Registro attività</h2>
+        <p className="text-xs text-slate-500 dark:text-slate-400">Chi ha creato, modificato o eliminato cosa (ultime {entries.length} voci)</p>
+      </CardHeader>
+      <CardBody className="p-0">
+        {loading ? (
+          <p className="p-6 text-center text-sm text-slate-400 dark:text-slate-500">Caricamento…</p>
+        ) : entries.length === 0 ? (
+          <p className="p-6 text-center text-sm text-slate-400 dark:text-slate-500">Nessuna attività registrata</p>
+        ) : (
+          <div className="max-h-[28rem] overflow-y-auto">
+            <table className="w-full text-sm">
+              <thead className="sticky top-0 border-b border-slate-100 bg-white dark:border-slate-700 dark:bg-slate-800 text-left text-xs uppercase text-slate-500 dark:text-slate-400">
+                <tr>
+                  <SortableTh label="Quando" sortKey="createdAt" currentKey={sortKey} currentDir={sortDir} onSort={onSort} />
+                  <SortableTh label="Chi" sortKey="userName" currentKey={sortKey} currentDir={sortDir} onSort={onSort} />
+                  <SortableTh label="Azione" sortKey="action" currentKey={sortKey} currentDir={sortDir} onSort={onSort} />
+                  <SortableTh label="Tipo" sortKey="entityType" currentKey={sortKey} currentDir={sortDir} onSort={onSort} />
+                  <SortableTh label="Nome" sortKey="entityName" currentKey={sortKey} currentDir={sortDir} onSort={onSort} />
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100 dark:divide-slate-700">
+                {sorted.map((e) => (
+                  <tr key={e.id} className="hover:bg-slate-50 dark:hover:bg-slate-700">
+                    <td className="whitespace-nowrap px-5 py-3 text-xs text-slate-500 dark:text-slate-400">
+                      {e.createdAt.replace("T", " ").slice(0, 16)}
+                    </td>
+                    <td className="px-5 py-3 text-slate-700 dark:text-slate-200">{e.userName}</td>
+                    <td className="px-5 py-3">
+                      <Badge color={ACTION_COLOR[e.action] ?? "#64748b"}>{ACTION_LABEL[e.action] ?? e.action}</Badge>
+                    </td>
+                    <td className="px-5 py-3 capitalize text-slate-600 dark:text-slate-300">{e.entityType}</td>
+                    <td className="px-5 py-3 text-slate-800 dark:text-slate-100">{e.entityName}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </CardBody>
+    </Card>
   );
 }
 

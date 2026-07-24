@@ -6,6 +6,7 @@ import { db } from "../db";
 import { people, assignments, projects, personCapacityPeriods } from "../schema";
 import { eq, asc, desc } from "drizzle-orm";
 import { asyncHandler } from "../asyncHandler";
+import { logActivity } from "../activityLog";
 
 export const peopleRouter = Router();
 
@@ -175,6 +176,7 @@ peopleRouter.post("/", asyncHandler(async (req, res) => {
   const parsed = personSchema.safeParse(req.body);
   if (!parsed.success) return res.status(400).json({ error: parsed.error.flatten() });
   const [created] = await db.insert(people).values(parsed.data).returning();
+  await logActivity(req.user!, "created", "persona", created.id, created.name);
   res.status(201).json(created);
 }));
 
@@ -191,11 +193,14 @@ peopleRouter.put("/:id", asyncHandler(async (req, res) => {
     .where(eq(people.id, id))
     .returning();
   if (!updated) return res.status(404).json({ error: "Persona non trovata" });
+  await logActivity(req.user!, "updated", "persona", updated.id, updated.name);
   res.json(updated);
 }));
 
 peopleRouter.delete("/:id", asyncHandler(async (req, res) => {
   const id = Number(req.params.id);
+  const [existing] = await db.select().from(people).where(eq(people.id, id)).limit(1);
   await db.delete(people).where(eq(people.id, id));
+  if (existing) await logActivity(req.user!, "deleted", "persona", id, existing.name);
   res.status(204).end();
 }));

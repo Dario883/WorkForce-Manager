@@ -80,6 +80,7 @@ export const projects = pgTable("projects", {
   status: projectStatusEnum("status").default("planned").notNull(),
   deliveryType: projectDeliveryTypeEnum("delivery_type").default("T&M").notNull(),
   color: varchar("color", { length: 32 }).default("#3457d5").notNull(),
+  pmId: integer("pm_id").references(() => people.id, { onDelete: "set null" }),
   startDate: date("start_date"),
   endDate: date("end_date"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
@@ -140,6 +141,28 @@ export const personCapacityPeriods = pgTable("person_capacity_periods", {
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
+// ── Activity log (chi ha modificato cosa) ────────────────────────────────
+// User/entity identifiers are denormalized as plain columns (not FKs) so the
+// log stays intact and readable even if the acting user or the edited entity
+// is later deleted.
+export const activityLogActionEnum = pgEnum("activity_log_action", [
+  "created",
+  "updated",
+  "deleted",
+]);
+
+export const activityLog = pgTable("activity_log", {
+  id: serial("id").primaryKey(),
+  userId: integer("user_id").notNull(),
+  userName: varchar("user_name", { length: 255 }).notNull(),
+  action: activityLogActionEnum("action").notNull(),
+  entityType: varchar("entity_type", { length: 64 }).notNull(),
+  entityId: integer("entity_id").notNull(),
+  entityName: varchar("entity_name", { length: 255 }).notNull(),
+  detail: text("detail"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
 // ── Settings (chiave-valore) ──────────────────────────────────────────────
 export const settings = pgTable("settings", {
   key: varchar("key", { length: 128 }).primaryKey(),
@@ -160,3 +183,5 @@ export type CapacityPeriod = typeof personCapacityPeriods.$inferSelect;
 export type InsertCapacityPeriod = typeof personCapacityPeriods.$inferInsert;
 export type Holiday = typeof holidays.$inferSelect;
 export type InsertHoliday = typeof holidays.$inferInsert;
+export type ActivityLogEntry = typeof activityLog.$inferSelect;
+export type InsertActivityLogEntry = typeof activityLog.$inferInsert;

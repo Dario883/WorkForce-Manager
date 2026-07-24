@@ -1,11 +1,13 @@
 import { Router } from "express";
 import { z } from "zod";
 import Papa from "papaparse";
+import { alias } from "drizzle-orm/pg-core";
 import { db } from "../db";
-import { projects } from "../schema";
+import { people, projects } from "../schema";
 import { eq, asc } from "drizzle-orm";
 import { asyncHandler } from "../asyncHandler";
 import { buildCommessaId } from "../commessaId";
+import { logActivity } from "../activityLog";
 
 export const projectsRouter = Router();
 
@@ -15,12 +17,34 @@ const projectSchema = z.object({
   status: z.enum(["planned", "active", "on_hold", "completed"]).default("planned"),
   deliveryType: z.enum(["TK", "T&M", "TaaS", "AMS"]).default("T&M"),
   color: z.string().default("#3457d5"),
+  pmId: z.number().int().positive().optional().nullable(),
   startDate: z.string().optional().nullable(),
   endDate: z.string().optional().nullable(),
 });
 
+const pms = alias(people, "pms");
+const PROJECT_COLUMNS = {
+  id: projects.id,
+  commessaId: projects.commessaId,
+  name: projects.name,
+  client: projects.client,
+  status: projects.status,
+  deliveryType: projects.deliveryType,
+  color: projects.color,
+  pmId: projects.pmId,
+  pmName: pms.name,
+  startDate: projects.startDate,
+  endDate: projects.endDate,
+  createdAt: projects.createdAt,
+  updatedAt: projects.updatedAt,
+};
+
 projectsRouter.get("/", asyncHandler(async (_req, res) => {
-  const rows = await db.select().from(projects).orderBy(asc(projects.name));
+  const rows = await db
+    .select(PROJECT_COLUMNS)
+    .from(projects)
+    .leftJoin(pms, eq(projects.pmId, pms.id))
+    .orderBy(asc(projects.name));
   res.json(rows);
 }));
 
@@ -117,7 +141,12 @@ projectsRouter.post("/import", asyncHandler(async (req, res) => {
 
 projectsRouter.get("/:id", asyncHandler(async (req, res) => {
   const id = Number(req.params.id);
-  const [project] = await db.select().from(projects).where(eq(projects.id, id)).limit(1);
+  const [project] = await db
+    .select(PROJECT_COLUMNS)
+    .from(projects)
+    .leftJoin(pms, eq(projects.pmId, pms.id))
+    .where(eq(projects.id, id))
+    .limit(1);
   if (!project) return res.status(404).json({ error: "Progetto non trovato" });
   res.json(project);
 }));
@@ -134,6 +163,7 @@ projectsRouter.post("/", asyncHandler(async (req, res) => {
     .insert(projects)
     .values({ ...parsed.data, commessaId: buildCommessaId(parsed.data.name, createdAt), createdAt })
     .returning();
+  await logActivity(req.user!, "created", "progetto", created.id, created.name);
   res.status(201).json(created);
 }));
 
@@ -155,11 +185,14 @@ projectsRouter.put("/:id", asyncHandler(async (req, res) => {
     .where(eq(projects.id, id))
     .returning();
   if (!updated) return res.status(404).json({ error: "Progetto non trovato" });
+  await logActivity(req.user!, "updated", "progetto", updated.id, updated.name);
   res.json(updated);
 }));
 
 projectsRouter.delete("/:id", asyncHandler(async (req, res) => {
   const id = Number(req.params.id);
+  const [existing] = await db.select().from(projects).where(eq(projects.id, id)).limit(1);
   await db.delete(projects).where(eq(projects.id, id));
+  if (existing) await logActivity(req.user!, "deleted", "progetto", id, existing.name);
   res.status(204).end();
 }));

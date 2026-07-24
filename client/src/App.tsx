@@ -11,6 +11,7 @@ import ProjectDetailPage from "./pages/ProjectDetailPage";
 import StaffingPage from "./pages/StaffingPage";
 import CalendarPage from "./pages/CalendarPage";
 import AbsencesPage from "./pages/AbsencesPage";
+import PMOverviewPage from "./pages/PMOverviewPage";
 import SettingsPage from "./pages/SettingsPage";
 
 function Protected({ children }: { children: React.ReactNode }) {
@@ -85,6 +86,13 @@ function AppRoutes() {
         <Protected>
           <Layout>
             <AbsencesPage />
+          </Layout>
+        </Protected>
+      </Route>
+      <Route path="/per-pm">
+        <Protected>
+          <Layout>
+            <PMOverviewPage />
           </Layout>
         </Protected>
       </Route>

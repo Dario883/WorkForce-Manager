@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { Link } from "wouter";
 import { api } from "../lib/api";
-import type { Assignment, Project } from "@shared/types";
+import type { Assignment, Person, Project } from "@shared/types";
 import { Card, CardBody, CardHeader } from "../components/Card";
 import Button from "../components/Button";
 import { Badge } from "../components/ui";
@@ -10,14 +10,20 @@ import ProjectModal, { DELIVERY_COLOR, STATUS_COLOR, STATUS_LABEL } from "../com
 export default function ProjectDetailPage({ id }: { id: number }) {
   const [project, setProject] = useState<Project | null>(null);
   const [assignments, setAssignments] = useState<Assignment[]>([]);
+  const [people, setPeople] = useState<Person[]>([]);
   const [loading, setLoading] = useState(true);
   const [modalOpen, setModalOpen] = useState(false);
 
   function load() {
-    Promise.all([api.get<Project>(`/projects/${id}`), api.get<Assignment[]>(`/assignments?projectId=${id}`)])
-      .then(([p, a]) => {
+    Promise.all([
+      api.get<Project>(`/projects/${id}`),
+      api.get<Assignment[]>(`/assignments?projectId=${id}`),
+      api.get<Person[]>("/people"),
+    ])
+      .then(([p, a, ppl]) => {
         setProject(p);
         setAssignments(a.sort((x, y) => (x.startDate < y.startDate ? 1 : -1)));
+        setPeople(ppl);
       })
       .finally(() => setLoading(false));
   }
@@ -51,7 +57,7 @@ export default function ProjectDetailPage({ id }: { id: number }) {
         </Button>
       </div>
 
-      <div className="mb-6 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+      <div className="mb-6 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-5">
         <Card>
           <CardBody>
             <p className="text-xs text-slate-500 dark:text-slate-400">Stato</p>
@@ -62,6 +68,20 @@ export default function ProjectDetailPage({ id }: { id: number }) {
           <CardBody>
             <p className="text-xs text-slate-500 dark:text-slate-400">Tipo di delivery</p>
             <Badge color={DELIVERY_COLOR[project.deliveryType]}>{project.deliveryType}</Badge>
+          </CardBody>
+        </Card>
+        <Card>
+          <CardBody>
+            <p className="text-xs text-slate-500 dark:text-slate-400">PM responsabile</p>
+            <p className="text-sm font-medium text-slate-800 dark:text-slate-100">
+              {project.pmName ? (
+                <Link href={`/people/${project.pmId}`} className="hover:text-brand-600 dark:hover:text-brand-400 hover:underline">
+                  {project.pmName}
+                </Link>
+              ) : (
+                "—"
+              )}
+            </p>
           </CardBody>
         </Card>
         <Card>
@@ -129,6 +149,7 @@ export default function ProjectDetailPage({ id }: { id: number }) {
         open={modalOpen}
         onClose={() => setModalOpen(false)}
         project={project}
+        people={people}
         onSaved={() => {
           setModalOpen(false);
           load();

@@ -26,6 +26,8 @@ export interface Project {
   status: ProjectStatus;
   deliveryType: DeliveryType;
   color: string;
+  pmId: number | null;
+  pmName?: string | null;
   startDate: string | null;
   endDate: string | null;
   createdAt: string;
@@ -112,4 +114,18 @@ export interface Settings {
   underutilization_threshold: string;
   overutilization_threshold: string;
   [key: string]: string;
+}
+
+export type ActivityAction = "created" | "updated" | "deleted";
+
+export interface ActivityLogEntry {
+  id: number;
+  userId: number;
+  userName: string;
+  action: ActivityAction;
+  entityType: string;
+  entityId: number;
+  entityName: string;
+  detail: string | null;
+  createdAt: string;
 }

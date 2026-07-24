@@ -1,9 +1,12 @@
 import { useEffect, useState } from "react";
 import { api, ApiError } from "../lib/api";
-import type { DeliveryType, Project, ProjectStatus } from "@shared/types";
+import type { DeliveryType, Person, Project, ProjectStatus } from "@shared/types";
 import Button from "./Button";
 import Modal from "./Modal";
 import { Field, Input, Select } from "./ui";
+
+// Stable reference, same reasoning as AssignmentModal's NO_PEOPLE.
+const NO_PEOPLE: Person[] = [];
 
 const COLORS = ["#3457d5", "#059669", "#d97706", "#dc2626", "#7c3aed", "#0891b2"];
 
@@ -41,17 +44,20 @@ export default function ProjectModal({
   open,
   onClose,
   project,
+  people = NO_PEOPLE,
   onSaved,
 }: {
   open: boolean;
   onClose: () => void;
   project: Project | null;
+  people?: Person[];
   onSaved: () => void;
 }) {
   const [name, setName] = useState("");
   const [client, setClient] = useState("");
   const [status, setStatus] = useState<ProjectStatus>("planned");
   const [deliveryType, setDeliveryType] = useState<DeliveryType>("T&M");
+  const [pmId, setPmId] = useState<number | "">("");
   const [color, setColor] = useState(COLORS[0]);
   const [startDate, setStartDate] = useState("");
   const [endDate, setEndDate] = useState("");
@@ -63,6 +69,7 @@ export default function ProjectModal({
       setClient(project.client ?? "");
       setStatus(project.status);
       setDeliveryType(project.deliveryType);
+      setPmId(project.pmId ?? "");
       setColor(project.color);
       setStartDate(project.startDate ?? "");
       setEndDate(project.endDate ?? "");
@@ -71,6 +78,7 @@ export default function ProjectModal({
       setClient("");
       setStatus("planned");
       setDeliveryType("T&M");
+      setPmId("");
       setColor(COLORS[Math.floor(Math.random() * COLORS.length)]);
       setStartDate("");
       setEndDate("");
@@ -85,6 +93,7 @@ export default function ProjectModal({
       client: client || null,
       status,
       deliveryType,
+      pmId: pmId === "" ? null : pmId,
       color,
       startDate: startDate || null,
       endDate: endDate || null,
@@ -139,6 +148,16 @@ export default function ProjectModal({
             </Select>
           </Field>
         </div>
+        <Field label="PM responsabile">
+          <Select value={pmId} onChange={(e) => setPmId(e.target.value ? Number(e.target.value) : "")}>
+            <option value="">Nessuno</option>
+            {people.map((p) => (
+              <option key={p.id} value={p.id}>
+                {p.name}
+              </option>
+            ))}
+          </Select>
+        </Field>
         <div className="grid grid-cols-2 gap-3">
           <Field label="Data inizio">
             <Input type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} />

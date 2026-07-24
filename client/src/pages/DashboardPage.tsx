@@ -58,7 +58,7 @@ export default function DashboardPage() {
   const [snapshot, setSnapshot] = useState<StaffingSnapshot | null>(null);
   const [prevSnapshot, setPrevSnapshot] = useState<StaffingSnapshot | null>(null);
   const [periodAssignments, setPeriodAssignments] = useState<Assignment[]>([]);
-  const [periodAbsences, setPeriodAbsences] = useState<Absence[]>([]);
+  const [allAbsences, setAllAbsences] = useState<Absence[]>([]);
   const [settings, setSettings] = useState<Settings | null>(null);
   const [loading, setLoading] = useState(true);
   const [drilldown, setDrilldown] = useState<{
@@ -108,7 +108,7 @@ export default function DashboardPage() {
         setSnapshot(snap);
         setPeriodAssignments(assignments.filter((a) => a.endDate >= from && a.startDate <= to));
         setPrevSnapshot(prevSnap);
-        setPeriodAbsences(absences.filter((a) => a.endDate >= from && a.startDate <= to));
+        setAllAbsences(absences);
       })
       .finally(() => setLoading(false));
   }, [view, anchor.toDateString()]);
@@ -142,6 +142,10 @@ export default function DashboardPage() {
     }) ?? [];
   const prevTeamAvg = prevAvgPerPerson.length ? prevAvgPerPerson.reduce((s, v) => s + v, 0) / prevAvgPerPerson.length : 0;
   const teamAvgDelta = teamAvg - prevTeamAvg;
+
+  const outOfThresholdCount = underAllocated.length + overAllocated.length;
+  const prevOutOfThresholdCount = prevAvgPerPerson.filter((v) => v < underThreshold || v > overThreshold).length;
+  const outOfThresholdDelta = outOfThresholdCount - prevOutOfThresholdCount;
 
   const deadlineCutoff = format(addDays(new Date(), UPCOMING_DEADLINE_DAYS), "yyyy-MM-dd");
   const startingCutoff = format(addDays(new Date(), UPCOMING_START_DAYS), "yyyy-MM-dd");
@@ -199,14 +203,30 @@ export default function DashboardPage() {
     count: projects.filter((p) => p.deliveryType === type).length,
   }));
 
+  const fromStr = format(range.start, "yyyy-MM-dd");
+  const toStr = format(range.end, "yyyy-MM-dd");
+  const prevFromStr = format(prevRange.start, "yyyy-MM-dd");
+  const prevToStr = format(prevRange.end, "yyyy-MM-dd");
+  const periodAbsences = allAbsences.filter((a) => a.endDate >= fromStr && a.startDate <= toStr);
+  const prevPeriodAbsences = allAbsences.filter((a) => a.endDate >= prevFromStr && a.startDate <= prevToStr);
+
+  function absenceDaysInRange(list: Absence[], rangeStartStr: string, rangeEndStr: string) {
+    let total = 0;
+    for (const a of list) {
+      if (a.status === "rifiutata") continue;
+      const clippedStart = a.startDate < rangeStartStr ? rangeStartStr : a.startDate;
+      const clippedEnd = a.endDate > rangeEndStr ? rangeEndStr : a.endDate;
+      total += differenceInCalendarDays(new Date(clippedEnd), new Date(clippedStart)) + 1;
+    }
+    return total;
+  }
+
   const absenceDaysByPerson = new Map<number, { personName: string; days: number }>();
-  let totalAbsenceDays = 0;
   for (const a of periodAbsences) {
     if (a.status === "rifiutata") continue;
-    const clippedStart = a.startDate < format(range.start, "yyyy-MM-dd") ? format(range.start, "yyyy-MM-dd") : a.startDate;
-    const clippedEnd = a.endDate > format(range.end, "yyyy-MM-dd") ? format(range.end, "yyyy-MM-dd") : a.endDate;
+    const clippedStart = a.startDate < fromStr ? fromStr : a.startDate;
+    const clippedEnd = a.endDate > toStr ? toStr : a.endDate;
     const days = differenceInCalendarDays(new Date(clippedEnd), new Date(clippedStart)) + 1;
-    totalAbsenceDays += days;
     const entry = absenceDaysByPerson.get(a.personId) ?? { personName: a.personName ?? "—", days: 0 };
     entry.days += days;
     absenceDaysByPerson.set(a.personId, entry);
@@ -214,6 +234,11 @@ export default function DashboardPage() {
   const absenceDaysList = [...absenceDaysByPerson.entries()]
     .map(([personId, v]) => ({ personId, ...v }))
     .sort((a, b) => b.days - a.days);
+  const totalAbsenceDays = absenceDaysInRange(periodAbsences, fromStr, toStr);
+  const prevTotalAbsenceDays = absenceDaysInRange(prevPeriodAbsences, prevFromStr, prevToStr);
+  const absenceDaysDelta = totalAbsenceDays - prevTotalAbsenceDays;
+
+  const pendingApprovals = allAbsences.filter((a) => a.status === "in_attesa");
 
   const periodLabel = `${format(range.start, "d MMM", { locale: it })} – ${format(range.end, "d MMM yyyy", {
     locale: it,
@@ -287,6 +312,38 @@ export default function DashboardPage() {
     });
   }
 
+  function openOutOfThresholdDrilldown() {
+    const rows = [...underAllocated, ...overAllocated]
+      .sort((a, b) => a.avg - b.avg)
+      .map((p) => ({
+        label: p.personName,
+        value: `${Math.round(p.avg)}%`,
+        color: p.avg < underThreshold ? "#d97706" : "#dc2626",
+        href: `/people/${p.personId}`,
+      }));
+    setDrilldown({
+      title: "Persone fuori soglia",
+      subtitle: `Sotto ${underThreshold}% o sopra ${overThreshold}% — media nel periodo`,
+      rows: rows.length > 0 ? rows : [{ label: "Nessuna persona fuori soglia", value: "" }],
+    });
+  }
+
+  function openPendingApprovalsDrilldown() {
+    setDrilldown({
+      title: "Richieste ferie in attesa",
+      subtitle: "Da approvare o rifiutare",
+      rows:
+        pendingApprovals.length > 0
+          ? pendingApprovals.map((a) => ({
+              label: `${a.personName} · ${a.startDate} → ${a.endDate}`,
+              value: a.type,
+              color: "#d97706",
+              href: "/absences",
+            }))
+          : [{ label: "Nessuna richiesta in attesa", value: "" }],
+    });
+  }
+
   function openAbsencesDrilldown() {
     setDrilldown({
       title: "Assenze nel periodo",
@@ -335,20 +392,16 @@ export default function DashboardPage() {
         <p className="text-slate-400 dark:text-slate-500">Caricamento…</p>
       ) : (
         <>
-      <div className="mb-6 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+      <div className="mb-6 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-5">
         <KpiCard label="Persone" value={people.length} icon="👥" href="/people" />
         <KpiCard label="Progetti attivi" value={activeProjects.length} icon="📁" href="/projects" />
         <KpiCard
-          label="Sotto-allocati"
-          value={underAllocated.length}
-          icon="⬇️"
-          tone={underAllocated.length > 0 ? "warn" : "ok"}
-        />
-        <KpiCard
-          label="Sovra-allocati"
-          value={overAllocated.length}
-          icon="⬆️"
-          tone={overAllocated.length > 0 ? "danger" : "ok"}
+          label="Persone fuori soglia"
+          value={outOfThresholdCount}
+          icon="⚖️"
+          tone={outOfThresholdCount > 0 ? "warn" : "ok"}
+          onClick={openOutOfThresholdDrilldown}
+          trendDelta={outOfThresholdDelta}
         />
         <KpiCard
           label={`Progetti in scadenza (${UPCOMING_DEADLINE_DAYS}gg)`}
@@ -371,23 +424,26 @@ export default function DashboardPage() {
           tone={projectsWithoutResources.length > 0 ? "danger" : "ok"}
           onClick={openWithoutResourcesDrilldown}
         />
-        <KpiCard label="Capacità libera nel periodo" value={`${freeHoursTotal}h`} icon="🕒" />
         <KpiCard
           label="Allocazione media team"
           value={`${Math.round(teamAvg)}%`}
           icon="📊"
           trendDelta={teamAvgDelta}
         />
-        <KpiCard
-          label="FTE allocati / disponibili"
-          value={`${fteAllocated.toFixed(1)} / ${fteTotal.toFixed(1)}`}
-          icon="🧮"
-        />
+        <KpiCard label="Capacità libera / FTE" value={`${freeHoursTotal}h · ${fteAllocated.toFixed(1)}/${fteTotal.toFixed(1)} FTE`} icon="🧮" />
         <KpiCard
           label="Giorni di assenza nel periodo"
           value={totalAbsenceDays}
           icon="🌴"
           onClick={openAbsencesDrilldown}
+          trendDelta={absenceDaysDelta}
+        />
+        <KpiCard
+          label="Richieste ferie in attesa"
+          value={pendingApprovals.length}
+          icon="📝"
+          tone={pendingApprovals.length > 0 ? "warn" : "ok"}
+          onClick={openPendingApprovalsDrilldown}
         />
       </div>
 

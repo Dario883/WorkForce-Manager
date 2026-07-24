@@ -5,6 +5,7 @@ import { db } from "../db";
 import { assignments, people, projects } from "../schema";
 import { eq, and, gte, lte, asc, ilike } from "drizzle-orm";
 import { asyncHandler } from "../asyncHandler";
+import { logActivity } from "../activityLog";
 import {
   addDays,
   endOfMonth,
@@ -153,10 +154,25 @@ assignmentsRouter.post("/import", asyncHandler(async (req, res) => {
   res.json({ imported, skipped });
 }));
 
+async function assignmentLabel(personId: number, projectId: number): Promise<string> {
+  const [[person], [project]] = await Promise.all([
+    db.select({ name: people.name }).from(people).where(eq(people.id, personId)).limit(1),
+    db.select({ name: projects.name }).from(projects).where(eq(projects.id, projectId)).limit(1),
+  ]);
+  return `${person?.name ?? "?"} → ${project?.name ?? "?"}`;
+}
+
 assignmentsRouter.post("/", asyncHandler(async (req, res) => {
   const parsed = assignmentSchema.safeParse(req.body);
   if (!parsed.success) return res.status(400).json({ error: parsed.error.flatten() });
   const [created] = await db.insert(assignments).values(parsed.data).returning();
+  await logActivity(
+    req.user!,
+    "created",
+    "assegnazione",
+    created.id,
+    await assignmentLabel(created.personId, created.projectId)
+  );
   res.status(201).json(created);
 }));
 
@@ -214,6 +230,13 @@ assignmentsRouter.post("/overwrite", asyncHandler(async (req, res) => {
   }
 
   const [created] = await db.insert(assignments).values(parsed.data).returning();
+  await logActivity(
+    req.user!,
+    "created",
+    "assegnazione",
+    created.id,
+    await assignmentLabel(created.personId, created.projectId)
+  );
   res.status(201).json(created);
 }));
 
@@ -227,12 +250,23 @@ assignmentsRouter.put("/:id", asyncHandler(async (req, res) => {
     .where(eq(assignments.id, id))
     .returning();
   if (!updated) return res.status(404).json({ error: "Assegnazione non trovata" });
+  await logActivity(
+    req.user!,
+    "updated",
+    "assegnazione",
+    updated.id,
+    await assignmentLabel(updated.personId, updated.projectId)
+  );
   res.json(updated);
 }));
 
 assignmentsRouter.delete("/:id", asyncHandler(async (req, res) => {
   const id = Number(req.params.id);
+  const [existing] = await db.select().from(assignments).where(eq(assignments.id, id)).limit(1);
   await db.delete(assignments).where(eq(assignments.id, id));
+  if (existing) {
+    await logActivity(req.user!, "deleted", "assegnazione", id, await assignmentLabel(existing.personId, existing.projectId));
+  }
   res.status(204).end();
 }));
 
@@ -317,5 +351,12 @@ assignmentsRouter.post("/:id/split", asyncHandler(async (req, res) => {
 
   await db.delete(assignments).where(eq(assignments.id, id));
   const created = await db.insert(assignments).values(newRows).returning();
+  await logActivity(
+    req.user!,
+    "updated",
+    "assegnazione",
+    id,
+    await assignmentLabel(original.personId, original.projectId)
+  );
   res.json(created);
 }));

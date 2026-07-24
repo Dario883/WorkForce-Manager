@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { Link } from "wouter";
 import { api } from "../lib/api";
-import type { DeliveryType, Project, ProjectStatus } from "@shared/types";
+import type { DeliveryType, Person, Project, ProjectStatus } from "@shared/types";
 import { Card, CardBody } from "../components/Card";
 import Button from "../components/Button";
 import { Badge, Input, Select, SortableTh } from "../components/ui";
@@ -10,22 +10,29 @@ import { compareValues, useSortable } from "../lib/sort";
 
 const STATUS_FILTERS: (ProjectStatus | "all")[] = ["all", "planned", "active", "on_hold", "completed"];
 
-type SortKey = "commessaId" | "name" | "client" | "status" | "deliveryType" | "startDate";
+type SortKey = "commessaId" | "name" | "client" | "status" | "deliveryType" | "pmName" | "startDate";
 
 export default function ProjectsPage() {
   const [projects, setProjects] = useState<Project[]>([]);
+  const [people, setPeople] = useState<Person[]>([]);
   const [loading, setLoading] = useState(true);
   const [modalOpen, setModalOpen] = useState(false);
   const [editing, setEditing] = useState<Project | null>(null);
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<ProjectStatus | "all">("all");
   const [deliveryFilter, setDeliveryFilter] = useState<DeliveryType | "all">("all");
+  const [pmFilter, setPmFilter] = useState<number | "all">("all");
   const fileInputRef = useRef<HTMLInputElement>(null);
   const { sortKey, sortDir, onSort } = useSortable<SortKey>("name");
+
+  const pmOptions = [...new Map(projects.filter((p) => p.pmId).map((p) => [p.pmId!, p.pmName!])).entries()].sort((a, b) =>
+    a[1].localeCompare(b[1])
+  );
 
   const filteredProjects = projects.filter((p) => {
     if (statusFilter !== "all" && p.status !== statusFilter) return false;
     if (deliveryFilter !== "all" && p.deliveryType !== deliveryFilter) return false;
+    if (pmFilter !== "all" && p.pmId !== pmFilter) return false;
     const q = search.trim().toLowerCase();
     if (!q) return true;
     return (
@@ -46,6 +53,8 @@ export default function ProjectsPage() {
           return STATUS_LABEL[p.status];
         case "deliveryType":
           return p.deliveryType;
+        case "pmName":
+          return p.pmName ?? "";
         case "startDate":
           return p.startDate ?? "";
         default:
@@ -57,9 +66,11 @@ export default function ProjectsPage() {
 
   function load() {
     setLoading(true);
-    api
-      .get<Project[]>("/projects")
-      .then(setProjects)
+    Promise.all([api.get<Project[]>("/projects"), api.get<Person[]>("/people")])
+      .then(([pr, p]) => {
+        setProjects(pr);
+        setPeople(p);
+      })
       .finally(() => setLoading(false));
   }
 
@@ -141,6 +152,14 @@ export default function ProjectsPage() {
             </option>
           ))}
         </Select>
+        <Select value={pmFilter} onChange={(e) => setPmFilter(e.target.value === "all" ? "all" : Number(e.target.value))} className="sm:w-48">
+          <option value="all">Tutti i PM</option>
+          {pmOptions.map(([id, name]) => (
+            <option key={id} value={id}>
+              {name}
+            </option>
+          ))}
+        </Select>
       </div>
 
       <Card>
@@ -160,6 +179,7 @@ export default function ProjectsPage() {
                   <SortableTh label="Cliente" sortKey="client" currentKey={sortKey} currentDir={sortDir} onSort={onSort} />
                   <SortableTh label="Stato" sortKey="status" currentKey={sortKey} currentDir={sortDir} onSort={onSort} />
                   <SortableTh label="Delivery" sortKey="deliveryType" currentKey={sortKey} currentDir={sortDir} onSort={onSort} />
+                  <SortableTh label="PM" sortKey="pmName" currentKey={sortKey} currentDir={sortDir} onSort={onSort} />
                   <SortableTh label="Periodo" sortKey="startDate" currentKey={sortKey} currentDir={sortDir} onSort={onSort} />
                   <th className="px-5 py-3"></th>
                 </tr>
@@ -184,6 +204,7 @@ export default function ProjectsPage() {
                     <td className="px-5 py-3">
                       <Badge color={DELIVERY_COLOR[p.deliveryType]}>{p.deliveryType}</Badge>
                     </td>
+                    <td className="px-5 py-3 text-slate-600 dark:text-slate-300">{p.pmName ?? "—"}</td>
                     <td className="px-5 py-3 text-slate-600 dark:text-slate-300">
                       {p.startDate ?? "—"} → {p.endDate ?? "—"}
                     </td>
@@ -213,6 +234,7 @@ export default function ProjectsPage() {
         open={modalOpen}
         onClose={() => setModalOpen(false)}
         project={editing}
+        people={people}
         onSaved={() => {
           setModalOpen(false);
           load();

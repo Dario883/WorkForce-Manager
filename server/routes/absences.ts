@@ -5,6 +5,7 @@ import { db } from "../db";
 import { absences, people } from "../schema";
 import { eq, asc, ilike } from "drizzle-orm";
 import { asyncHandler } from "../asyncHandler";
+import { logActivity } from "../activityLog";
 
 export const absencesRouter = Router();
 
@@ -130,6 +131,11 @@ absencesRouter.post("/import", asyncHandler(async (req, res) => {
   res.json({ imported, skipped });
 }));
 
+async function personName(personId: number): Promise<string> {
+  const [person] = await db.select({ name: people.name }).from(people).where(eq(people.id, personId)).limit(1);
+  return person?.name ?? "?";
+}
+
 absencesRouter.put("/:id/status", asyncHandler(async (req, res) => {
   const id = Number(req.params.id);
   const parsed = statusSchema.safeParse(req.body);
@@ -140,6 +146,13 @@ absencesRouter.put("/:id/status", asyncHandler(async (req, res) => {
     .where(eq(absences.id, id))
     .returning();
   if (!updated) return res.status(404).json({ error: "Assenza non trovata" });
+  await logActivity(
+    req.user!,
+    "updated",
+    "assenza",
+    updated.id,
+    `${await personName(updated.personId)} (${parsed.data.status})`
+  );
   res.json(updated);
 }));
 
@@ -150,6 +163,7 @@ absencesRouter.post("/", asyncHandler(async (req, res) => {
     return res.status(400).json({ error: "La data di fine non può precedere la data di inizio" });
   }
   const [created] = await db.insert(absences).values(parsed.data).returning();
+  await logActivity(req.user!, "created", "assenza", created.id, await personName(created.personId));
   res.status(201).json(created);
 }));
 
@@ -163,11 +177,14 @@ absencesRouter.put("/:id", asyncHandler(async (req, res) => {
     .where(eq(absences.id, id))
     .returning();
   if (!updated) return res.status(404).json({ error: "Assenza non trovata" });
+  await logActivity(req.user!, "updated", "assenza", updated.id, await personName(updated.personId));
   res.json(updated);
 }));
 
 absencesRouter.delete("/:id", asyncHandler(async (req, res) => {
   const id = Number(req.params.id);
+  const [existing] = await db.select().from(absences).where(eq(absences.id, id)).limit(1);
   await db.delete(absences).where(eq(absences.id, id));
+  if (existing) await logActivity(req.user!, "deleted", "assenza", id, await personName(existing.personId));
   res.status(204).end();
 }));
