@@ -1,0 +1,1 @@
+ALTER TABLE "projects" ADD COLUMN "commessa_id" varchar(255);

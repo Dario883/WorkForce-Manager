@@ -14,6 +14,7 @@ export interface Person {
 
 export interface Project {
   id: number;
+  commessaId: string;
   name: string;
   client: string | null;
   status: ProjectStatus;

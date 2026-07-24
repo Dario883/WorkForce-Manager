@@ -8,6 +8,20 @@
       "when": 1784712310680,
       "tag": "0000_late_shinobi_shaw",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1784918687917,
+      "tag": "0001_add_project_commessa_id_nullable",
+      "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1784918751033,
+      "tag": "0002_enforce_project_commessa_id_and_name_unique",
+      "breakpoints": true
     }
   ]
 }

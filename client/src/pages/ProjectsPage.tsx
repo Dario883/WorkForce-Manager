@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { api } from "../lib/api";
+import { api, ApiError } from "../lib/api";
 import type { Project, ProjectStatus } from "@shared/types";
 import { Card, CardBody } from "../components/Card";
 import Button from "../components/Button";
@@ -33,7 +33,11 @@ export default function ProjectsPage() {
   const filteredProjects = projects.filter((p) => {
     const q = search.trim().toLowerCase();
     if (!q) return true;
-    return p.name.toLowerCase().includes(q) || (p.client ?? "").toLowerCase().includes(q);
+    return (
+      p.name.toLowerCase().includes(q) ||
+      (p.client ?? "").toLowerCase().includes(q) ||
+      p.commessaId.toLowerCase().includes(q)
+    );
   });
 
   function load() {
@@ -113,6 +117,7 @@ export default function ProjectsPage() {
             <table className="w-full text-sm">
               <thead className="border-b border-slate-100 text-left text-xs uppercase text-slate-500">
                 <tr>
+                  <th className="px-5 py-3">ID Commessa</th>
                   <th className="px-5 py-3">Progetto</th>
                   <th className="px-5 py-3">Cliente</th>
                   <th className="px-5 py-3">Stato</th>
@@ -123,6 +128,7 @@ export default function ProjectsPage() {
               <tbody className="divide-y divide-slate-100">
                 {filteredProjects.map((p) => (
                   <tr key={p.id} className="hover:bg-slate-50">
+                    <td className="px-5 py-3 font-mono text-xs text-slate-500">{p.commessaId}</td>
                     <td className="px-5 py-3 font-medium text-slate-800">
                       <span className="mr-2 inline-block h-2.5 w-2.5 rounded-full" style={{ backgroundColor: p.color }} />
                       {p.name}
@@ -224,6 +230,8 @@ function ProjectModal({
         await api.post("/projects", payload);
       }
       onSaved();
+    } catch (err) {
+      alert(err instanceof ApiError ? err.message : "Errore durante il salvataggio del progetto.");
     } finally {
       setSaving(false);
     }
@@ -232,6 +240,13 @@ function ProjectModal({
   return (
     <Modal open={open} onClose={onClose} title={project ? "Modifica progetto" : "Nuovo progetto"}>
       <form onSubmit={handleSubmit}>
+        {project && (
+          <Field label="ID Commessa">
+            <p className="rounded-md border border-slate-200 bg-slate-50 px-3 py-2 font-mono text-xs text-slate-500">
+              {project.commessaId}
+            </p>
+          </Field>
+        )}
         <Field label="Nome progetto">
           <Input required value={name} onChange={(e) => setName(e.target.value)} />
         </Field>

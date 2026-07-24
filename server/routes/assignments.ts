@@ -160,6 +160,63 @@ assignmentsRouter.post("/", asyncHandler(async (req, res) => {
   res.status(201).json(created);
 }));
 
+/**
+ * Like POST "/", but instead of adding a parallel row, first clears out any
+ * existing assignment(s) of the same person+project that overlap the new
+ * date range — truncating the non-overlapping tail/head of each, splitting
+ * one in two if the new range falls entirely inside it, or dropping it
+ * outright if the new range fully covers it — before inserting the new row.
+ * Used by the "Nuova assegnazione" flow's "sovrascrivi" option.
+ */
+assignmentsRouter.post("/overwrite", asyncHandler(async (req, res) => {
+  const parsed = assignmentSchema.safeParse(req.body);
+  if (!parsed.success) return res.status(400).json({ error: parsed.error.flatten() });
+  const { personId, projectId, startDate, endDate } = parsed.data;
+
+  const existing = await db
+    .select()
+    .from(assignments)
+    .where(and(eq(assignments.personId, personId), eq(assignments.projectId, projectId)));
+
+  for (const a of existing) {
+    const overlaps = a.startDate <= endDate && a.endDate >= startDate;
+    if (!overlaps) continue;
+
+    const startsBefore = a.startDate < startDate;
+    const endsAfter = a.endDate > endDate;
+
+    if (startsBefore && endsAfter) {
+      await db.insert(assignments).values({
+        personId: a.personId,
+        projectId: a.projectId,
+        percentage: a.percentage,
+        startDate: a.startDate,
+        endDate: fmt(addDays(new Date(startDate), -1)),
+        periodType: a.periodType,
+      });
+      await db
+        .update(assignments)
+        .set({ startDate: fmt(addDays(new Date(endDate), 1)), updatedAt: new Date() })
+        .where(eq(assignments.id, a.id));
+    } else if (startsBefore) {
+      await db
+        .update(assignments)
+        .set({ endDate: fmt(addDays(new Date(startDate), -1)), updatedAt: new Date() })
+        .where(eq(assignments.id, a.id));
+    } else if (endsAfter) {
+      await db
+        .update(assignments)
+        .set({ startDate: fmt(addDays(new Date(endDate), 1)), updatedAt: new Date() })
+        .where(eq(assignments.id, a.id));
+    } else {
+      await db.delete(assignments).where(eq(assignments.id, a.id));
+    }
+  }
+
+  const [created] = await db.insert(assignments).values(parsed.data).returning();
+  res.status(201).json(created);
+}));
+
 assignmentsRouter.put("/:id", asyncHandler(async (req, res) => {
   const id = Number(req.params.id);
   const parsed = assignmentSchema.partial().safeParse(req.body);

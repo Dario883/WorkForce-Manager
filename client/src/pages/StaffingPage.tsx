@@ -1,10 +1,10 @@
 import { useEffect, useRef, useState } from "react";
 import { api } from "../lib/api";
-import type { Assignment, Person, Project, PeriodType } from "@shared/types";
+import type { Assignment, Person, Project } from "@shared/types";
 import { Card, CardBody } from "../components/Card";
 import Button from "../components/Button";
-import Modal from "../components/Modal";
-import { Badge, Field, Input, Select } from "../components/ui";
+import { Badge } from "../components/ui";
+import AssignmentModal from "../components/AssignmentModal";
 
 export default function StaffingPage() {
   const [assignments, setAssignments] = useState<Assignment[]>([]);
@@ -147,129 +147,5 @@ export default function StaffingPage() {
         }}
       />
     </div>
-  );
-}
-
-function AssignmentModal({
-  open,
-  onClose,
-  assignment,
-  people,
-  projects,
-  onSaved,
-}: {
-  open: boolean;
-  onClose: () => void;
-  assignment: Assignment | null;
-  people: Person[];
-  projects: Project[];
-  onSaved: () => void;
-}) {
-  const [personId, setPersonId] = useState<number | "">("");
-  const [projectId, setProjectId] = useState<number | "">("");
-  const [percentage, setPercentage] = useState(100);
-  const [startDate, setStartDate] = useState("");
-  const [endDate, setEndDate] = useState("");
-  const [periodType, setPeriodType] = useState<PeriodType>("week");
-  const [saving, setSaving] = useState(false);
-
-  useEffect(() => {
-    if (assignment) {
-      setPersonId(assignment.personId);
-      setProjectId(assignment.projectId);
-      setPercentage(assignment.percentage);
-      setStartDate(assignment.startDate);
-      setEndDate(assignment.endDate);
-      setPeriodType(assignment.periodType);
-    } else {
-      setPersonId(people[0]?.id ?? "");
-      setProjectId(projects[0]?.id ?? "");
-      setPercentage(100);
-      setStartDate("");
-      setEndDate("");
-      setPeriodType("week");
-    }
-  }, [assignment, open, people, projects]);
-
-  async function handleSubmit(e: React.FormEvent) {
-    e.preventDefault();
-    if (personId === "" || projectId === "") return;
-    setSaving(true);
-    const payload = {
-      personId: Number(personId),
-      projectId: Number(projectId),
-      percentage,
-      startDate,
-      endDate,
-      periodType,
-    };
-    try {
-      if (assignment) {
-        await api.put(`/assignments/${assignment.id}`, payload);
-      } else {
-        await api.post("/assignments", payload);
-      }
-      onSaved();
-    } finally {
-      setSaving(false);
-    }
-  }
-
-  return (
-    <Modal open={open} onClose={onClose} title={assignment ? "Modifica assegnazione" : "Nuova assegnazione"}>
-      <form onSubmit={handleSubmit}>
-        <Field label="Persona">
-          <Select value={personId} onChange={(e) => setPersonId(Number(e.target.value))} required>
-            <option value="" disabled>
-              Seleziona…
-            </option>
-            {people.map((p) => (
-              <option key={p.id} value={p.id}>
-                {p.name}
-              </option>
-            ))}
-          </Select>
-        </Field>
-        <Field label="Progetto">
-          <Select value={projectId} onChange={(e) => setProjectId(Number(e.target.value))} required>
-            <option value="" disabled>
-              Seleziona…
-            </option>
-            {projects.map((p) => (
-              <option key={p.id} value={p.id}>
-                {p.name}
-              </option>
-            ))}
-          </Select>
-        </Field>
-        <Field label="Percentuale allocazione">
-          <Input
-            type="number"
-            min={1}
-            max={200}
-            value={percentage}
-            onChange={(e) => setPercentage(Number(e.target.value))}
-            required
-          />
-        </Field>
-        <div className="grid grid-cols-2 gap-3">
-          <Field label="Data inizio">
-            <Input type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} required />
-          </Field>
-          <Field label="Data fine">
-            <Input type="date" value={endDate} onChange={(e) => setEndDate(e.target.value)} required />
-          </Field>
-        </div>
-
-        <div className="mt-4 flex justify-end gap-2">
-          <Button type="button" variant="secondary" onClick={onClose}>
-            Annulla
-          </Button>
-          <Button type="submit" disabled={saving}>
-            {saving ? "Salvataggio…" : "Salva"}
-          </Button>
-        </div>
-      </form>
-    </Modal>
   );
 }

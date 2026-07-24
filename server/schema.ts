@@ -48,7 +48,8 @@ export const people = pgTable("people", {
 // ── Projects (progetti) ──────────────────────────────────────────────────
 export const projects = pgTable("projects", {
   id: serial("id").primaryKey(),
-  name: varchar("name", { length: 255 }).notNull(),
+  commessaId: varchar("commessa_id", { length: 255 }).notNull().unique(),
+  name: varchar("name", { length: 255 }).notNull().unique(),
   client: varchar("client", { length: 255 }),
   status: projectStatusEnum("status").default("planned").notNull(),
   color: varchar("color", { length: 32 }).default("#3457d5").notNull(),

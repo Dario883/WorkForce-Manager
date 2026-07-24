@@ -5,6 +5,7 @@ import { db } from "../db";
 import { projects } from "../schema";
 import { eq, asc } from "drizzle-orm";
 import { asyncHandler } from "../asyncHandler";
+import { buildCommessaId } from "../commessaId";
 
 export const projectsRouter = Router();
 
@@ -36,6 +37,7 @@ projectsRouter.get("/export", asyncHandler(async (_req, res) => {
   const rows = await db.select().from(projects).orderBy(asc(projects.name));
   const csv = Papa.unparse(
     rows.map((p) => ({
+      commessaId: p.commessaId,
       name: p.name,
       client: p.client ?? "",
       status: p.status,
@@ -82,13 +84,17 @@ projectsRouter.post("/import", asyncHandler(async (req, res) => {
   for (const row of rows) {
     if (!row.name?.trim()) continue;
     try {
+      const name = row.name.trim();
+      const createdAt = new Date();
       await db.insert(projects).values({
-        name: row.name.trim(),
+        commessaId: buildCommessaId(name, createdAt),
+        name,
         client: row.client?.trim() || null,
         status: parseStatus(row.status) as any,
         startDate: parseDate(row.startDate),
         endDate: parseDate(row.endDate),
         color: row.color?.trim() || "#3457d5",
+        createdAt,
       });
       imported++;
     } catch (err) {
@@ -109,7 +115,15 @@ projectsRouter.get("/:id", asyncHandler(async (req, res) => {
 projectsRouter.post("/", asyncHandler(async (req, res) => {
   const parsed = projectSchema.safeParse(req.body);
   if (!parsed.success) return res.status(400).json({ error: parsed.error.flatten() });
-  const [created] = await db.insert(projects).values(parsed.data).returning();
+
+  const [existing] = await db.select().from(projects).where(eq(projects.name, parsed.data.name)).limit(1);
+  if (existing) return res.status(409).json({ error: "Esiste già un progetto con questo nome" });
+
+  const createdAt = new Date();
+  const [created] = await db
+    .insert(projects)
+    .values({ ...parsed.data, commessaId: buildCommessaId(parsed.data.name, createdAt), createdAt })
+    .returning();
   res.status(201).json(created);
 }));
 
@@ -117,6 +131,14 @@ projectsRouter.put("/:id", asyncHandler(async (req, res) => {
   const id = Number(req.params.id);
   const parsed = projectSchema.partial().safeParse(req.body);
   if (!parsed.success) return res.status(400).json({ error: parsed.error.flatten() });
+
+  if (parsed.data.name) {
+    const [existing] = await db.select().from(projects).where(eq(projects.name, parsed.data.name)).limit(1);
+    if (existing && existing.id !== id) {
+      return res.status(409).json({ error: "Esiste già un progetto con questo nome" });
+    }
+  }
+
   const [updated] = await db
     .update(projects)
     .set({ ...parsed.data, updatedAt: new Date() })
