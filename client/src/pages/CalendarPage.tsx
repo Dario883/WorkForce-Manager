@@ -9,25 +9,30 @@ import AssignmentModal from "../components/AssignmentModal";
 import {
   addMonths,
   addWeeks,
+  addYears,
   eachDayOfInterval,
+  eachMonthOfInterval,
   eachWeekOfInterval,
   endOfMonth,
   endOfWeek,
+  endOfYear,
   format,
   isWeekend,
   startOfMonth,
   startOfWeek,
+  startOfYear,
 } from "date-fns";
 import { it } from "date-fns/locale";
 
-type ViewMode = "week" | "month";
+type ViewMode = "week" | "month" | "year";
 type ViewUnit = "percentage" | "hours";
-type EditUnit = "day" | "week";
+type EditUnit = "day" | "week" | "month";
 
-// A column is either a single day (week view) or a whole week (month view).
-// Editing/creating an assignment always targets [rangeStart, rangeEnd] with
-// `unit` as the periodType/split unit, so month-view edits apply to the
-// entire underlying week instead of a single day.
+// A column is a single day (week view), a whole week (month view), or a
+// whole month (year view). Editing/creating an assignment always targets
+// [rangeStart, rangeEnd] with `unit` as the periodType/split unit, so
+// month/year-view edits apply to the entire underlying week/month instead of
+// a single day.
 type Column = {
   key: string;
   label1: string;
@@ -76,6 +81,20 @@ function buildColumns(view: ViewMode, rangeStart: Date, rangeEnd: Date): Column[
         rangeEnd: key,
         weekend: isWeekend(d),
         unit: "day" as const,
+      };
+    });
+  }
+  if (view === "year") {
+    return eachMonthOfInterval({ start: rangeStart, end: rangeEnd }).map((monthStart) => {
+      const monthEnd = endOfMonth(monthStart);
+      return {
+        key: format(monthStart, "yyyy-MM-dd"),
+        label1: format(monthStart, "MMM", { locale: it }),
+        label2: format(monthStart, "yyyy"),
+        rangeStart: format(monthStart, "yyyy-MM-dd"),
+        rangeEnd: format(monthEnd, "yyyy-MM-dd"),
+        weekend: false,
+        unit: "month" as const,
       };
     });
   }
@@ -205,6 +224,8 @@ export default function CalendarPage() {
   const range =
     view === "week"
       ? { start: startOfWeek(anchor, { weekStartsOn: 1 }), end: endOfWeek(anchor, { weekStartsOn: 1 }) }
+      : view === "year"
+      ? { start: startOfYear(anchor), end: endOfYear(anchor) }
       : { start: startOfMonth(anchor), end: endOfMonth(anchor) };
 
   function load() {
@@ -223,9 +244,10 @@ export default function CalendarPage() {
   }, []);
 
   const columns = buildColumns(view, range.start, range.end);
+  const todayStr = format(new Date(), "yyyy-MM-dd");
 
   function shiftPeriod(dir: 1 | -1) {
-    setAnchor((a) => (view === "week" ? addWeeks(a, dir) : addMonths(a, dir)));
+    setAnchor((a) => (view === "week" ? addWeeks(a, dir) : view === "year" ? addYears(a, dir) : addMonths(a, dir)));
   }
 
   function loadPersonAssignments(personId: number) {
@@ -303,7 +325,7 @@ export default function CalendarPage() {
             ))}
           </div>
           <div className="flex rounded-lg border border-slate-200 bg-white p-0.5">
-            {(["week", "month"] as ViewMode[]).map((m) => (
+            {(["week", "month", "year"] as ViewMode[]).map((m) => (
               <button
                 key={m}
                 onClick={() => setView(m)}
@@ -311,7 +333,7 @@ export default function CalendarPage() {
                   view === m ? "bg-brand-500 text-white" : "text-slate-600"
                 }`}
               >
-                {m === "week" ? "Settimana" : "Mese"}
+                {m === "week" ? "Settimana" : m === "month" ? "Mese" : "Anno"}
               </button>
             ))}
           </div>
@@ -340,17 +362,22 @@ export default function CalendarPage() {
                   <th className="sticky left-0 z-10 min-w-[200px] border-b border-r border-slate-100 bg-white px-4 py-3 text-left text-xs uppercase text-slate-500">
                     Persona
                   </th>
-                  {columns.map((col) => (
-                    <th
-                      key={col.key}
-                      className={`${
-                        view === "month" ? "min-w-[90px]" : "min-w-[70px]"
-                      } border-b border-slate-100 px-2 py-3 text-center text-xs font-medium text-slate-500`}
-                    >
-                      <div>{col.label1}</div>
-                      <div className="text-slate-400">{col.label2}</div>
-                    </th>
-                  ))}
+                  {columns.map((col) => {
+                    const isToday = col.rangeStart <= todayStr && todayStr <= col.rangeEnd;
+                    return (
+                      <th
+                        key={col.key}
+                        className={`${
+                          view === "month" ? "min-w-[90px]" : view === "year" ? "min-w-[60px]" : "min-w-[70px]"
+                        } border-b px-2 py-3 text-center text-xs font-medium ${
+                          isToday ? "border-brand-300 bg-brand-50 text-brand-700" : "border-slate-100 text-slate-500"
+                        }`}
+                      >
+                        <div className={isToday ? "font-semibold" : ""}>{col.label1}</div>
+                        <div className={isToday ? "text-brand-500" : "text-slate-400"}>{col.label2}</div>
+                      </th>
+                    );
+                  })}
                   <th className="min-w-[40px] border-b border-slate-100"></th>
                 </tr>
               </thead>
@@ -378,6 +405,7 @@ export default function CalendarPage() {
                         {columns.map((col) => {
                           const cell = snapshotDayForColumn(person, col);
                           const total = cell?.total ?? 0;
+                          const isToday = col.rangeStart <= todayStr && todayStr <= col.rangeEnd;
                           const label =
                             viewUnit === "percentage"
                               ? total > 0
@@ -385,7 +413,7 @@ export default function CalendarPage() {
                                 : "—"
                               : pctToHoursLabel(total, person.capacityHoursPerWeek, col.weekend);
                           return (
-                            <td key={col.key} className="p-1 text-center">
+                            <td key={col.key} className={`p-1 text-center ${isToday ? "bg-brand-50/40" : ""}`}>
                               <button
                                 onClick={() =>
                                   setEditCell({
@@ -398,7 +426,7 @@ export default function CalendarPage() {
                                 }
                                 className={`h-10 w-full rounded-md text-xs font-semibold transition hover:ring-2 hover:ring-brand-300 ${allocColor(
                                   total
-                                )}`}
+                                )} ${isToday ? "ring-1 ring-brand-400" : ""}`}
                                 title={cell?.items.map((i) => `${i.projectName}: ${i.percentage}%`).join("\n")}
                               >
                                 {label}
@@ -445,12 +473,13 @@ export default function CalendarPage() {
                                 </td>
                                 {columns.map((col) => {
                                   const cell = g.byDay[col.key];
+                                  const isToday = col.rangeStart <= todayStr && todayStr <= col.rangeEnd;
 
                                   if (viewUnit === "hours" && col.weekend) {
                                     return (
                                       <td
                                         key={col.key}
-                                        className="p-1 text-center text-xs text-slate-300"
+                                        className={`p-1 text-center text-xs text-slate-300 ${isToday ? "bg-brand-50/40" : ""}`}
                                         title="Passa alla vista % per modificare i weekend"
                                       >
                                         —
@@ -465,13 +494,15 @@ export default function CalendarPage() {
                                       ? pct
                                       : Math.round(dailyCapacity(person.capacityHoursPerWeek) * (pct / 100) * 10) / 10;
                                   return (
-                                    <td key={col.key} className="p-1">
+                                    <td key={col.key} className={`p-1 ${isToday ? "bg-brand-50/40" : ""}`}>
                                       <input
                                         type="number"
                                         defaultValue={displayValue}
                                         placeholder="—"
                                         key={`${g.key}-${col.key}-${displayValue}-${viewUnit}`}
-                                        className="h-8 w-full rounded border border-slate-200 text-center text-xs placeholder:text-slate-300 focus:border-brand-400 focus:outline-none"
+                                        className={`h-8 w-full rounded border text-center text-xs placeholder:text-slate-300 focus:border-brand-400 focus:outline-none ${
+                                          isToday ? "border-brand-300" : "border-slate-200"
+                                        }`}
                                         onBlur={(e) => {
                                           const raw = e.target.value.trim();
                                           if (raw === "") return;
@@ -648,7 +679,11 @@ function EditCellModal({
       ) : assignments.length === 0 ? (
         <div>
           <p className="mb-3 text-sm text-slate-400">
-            {cell.unit === "week" ? "Nessuna assegnazione attiva in questa settimana." : "Nessuna assegnazione attiva in questo giorno."}
+            {cell.unit === "month"
+              ? "Nessuna assegnazione attiva in questo mese."
+              : cell.unit === "week"
+              ? "Nessuna assegnazione attiva in questa settimana."
+              : "Nessuna assegnazione attiva in questo giorno."}
           </p>
           <div className="flex justify-end gap-2">
             <Button variant="secondary" onClick={onClose}>
@@ -660,7 +695,9 @@ function EditCellModal({
       ) : (
         <div>
           <p className="mb-3 text-xs text-slate-500">
-            {cell.unit === "week"
+            {cell.unit === "month"
+              ? "Modifica la percentuale per questo mese soltanto — l'assegnazione verrà divisa automaticamente."
+              : cell.unit === "week"
               ? "Modifica la percentuale per questa settimana soltanto — l'assegnazione verrà divisa automaticamente."
               : "Modifica la percentuale per questo giorno soltanto — l'assegnazione verrà divisa automaticamente."}
           </p>
