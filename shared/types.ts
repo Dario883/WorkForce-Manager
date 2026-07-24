@@ -13,6 +13,7 @@ export interface Person {
   capacityHoursPerWeek: number;
   managerId: number | null;
   managerName?: string | null;
+  isApprover: boolean;
   createdAt: string;
   updatedAt: string;
 }

@@ -4,6 +4,8 @@ import { api } from "../lib/api";
 import Button from "../components/Button";
 import { Card, CardBody, CardHeader } from "../components/Card";
 import { Badge } from "../components/ui";
+import Modal from "../components/Modal";
+import DonutChart from "../components/DonutChart";
 import type { Absence, Assignment, DeliveryType, Person, Project, ProjectStatus, Settings, StaffingSnapshot } from "@shared/types";
 import { DELIVERY_COLOR, DELIVERY_LABEL } from "../components/ProjectModal";
 import {
@@ -59,6 +61,11 @@ export default function DashboardPage() {
   const [periodAbsences, setPeriodAbsences] = useState<Absence[]>([]);
   const [settings, setSettings] = useState<Settings | null>(null);
   const [loading, setLoading] = useState(true);
+  const [drilldown, setDrilldown] = useState<{
+    title: string;
+    subtitle?: string;
+    rows: { label: string; value: string; color?: string; href?: string }[];
+  } | null>(null);
 
   const range =
     view === "week"
@@ -204,7 +211,9 @@ export default function DashboardPage() {
     entry.days += days;
     absenceDaysByPerson.set(a.personId, entry);
   }
-  const absenceDaysList = [...absenceDaysByPerson.values()].sort((a, b) => b.days - a.days);
+  const absenceDaysList = [...absenceDaysByPerson.entries()]
+    .map(([personId, v]) => ({ personId, ...v }))
+    .sort((a, b) => b.days - a.days);
 
   const periodLabel = `${format(range.start, "d MMM", { locale: it })} – ${format(range.end, "d MMM yyyy", {
     locale: it,
@@ -214,6 +223,80 @@ export default function DashboardPage() {
     status,
     count: projects.filter((p) => p.status === status).length,
   }));
+
+  function openProjectsDrilldown(title: string, subtitle: string | undefined, rows: Project[]) {
+    setDrilldown({
+      title,
+      subtitle,
+      rows:
+        rows.length > 0
+          ? rows.map((p) => ({ label: p.name, value: p.client ?? "—", href: `/projects/${p.id}` }))
+          : [{ label: "Nessun progetto", value: "" }],
+    });
+  }
+
+  function openStatusDrilldown(status: ProjectStatus) {
+    openProjectsDrilldown(`Progetti · ${STATUS_LABEL[status]}`, undefined, projects.filter((p) => p.status === status));
+  }
+
+  function openDeliveryDrilldown(type: DeliveryType) {
+    openProjectsDrilldown(`Progetti · ${type}`, DELIVERY_LABEL[type], projects.filter((p) => p.deliveryType === type));
+  }
+
+  function openUtilizationDrilldown(projectName: string) {
+    const rows = periodAssignments
+      .filter((a) => a.projectName === projectName)
+      .map((a) => ({ label: a.personName ?? "—", value: `${a.percentage}%`, href: `/people/${a.personId}` }));
+    setDrilldown({
+      title: `Utilizzo capacità · ${projectName}`,
+      subtitle: "Persone allocate nel periodo selezionato",
+      rows: rows.length > 0 ? rows : [{ label: "Nessuna allocazione nel periodo", value: "" }],
+    });
+  }
+
+  function openDeadlineDrilldown() {
+    setDrilldown({
+      title: "Progetti in scadenza",
+      subtitle: `Attivi, entro ${UPCOMING_DEADLINE_DAYS} giorni`,
+      rows:
+        projectsNearingDeadline.length > 0
+          ? projectsNearingDeadline.map((p) => ({ label: p.name, value: p.endDate ?? "—", color: "#d97706", href: `/projects/${p.id}` }))
+          : [{ label: "Nessun progetto in scadenza a breve", value: "" }],
+    });
+  }
+
+  function openStartingSoonDrilldown() {
+    setDrilldown({
+      title: "Progetti in partenza",
+      subtitle: `Entro ${UPCOMING_START_DAYS} giorni`,
+      rows:
+        projectsStartingSoon.length > 0
+          ? projectsStartingSoon.map((p) => ({ label: p.name, value: p.startDate ?? "—", color: "#059669", href: `/projects/${p.id}` }))
+          : [{ label: "Nessun progetto in partenza a breve", value: "" }],
+    });
+  }
+
+  function openWithoutResourcesDrilldown() {
+    setDrilldown({
+      title: "Progetti senza risorse",
+      subtitle: "Attivi, nessuna assegnazione nel periodo",
+      rows:
+        projectsWithoutResources.length > 0
+          ? projectsWithoutResources.map((p) => ({ label: p.name, value: p.client ?? "—", color: "#dc2626", href: `/projects/${p.id}` }))
+          : [{ label: "Tutti i progetti attivi hanno risorse", value: "" }],
+    });
+  }
+
+  function openAbsencesDrilldown() {
+    setDrilldown({
+      title: "Assenze nel periodo",
+      subtitle: "Giorni di ferie/assenza per persona",
+      rows:
+        absenceDaysList.length > 0
+          ? absenceDaysList.map((a) => ({ label: a.personName, value: `${a.days} gg`, color: "#0891b2", href: `/people/${a.personId}` }))
+          : [{ label: "Nessuna assenza nel periodo selezionato", value: "" }],
+    });
+  }
 
   return (
     <div>
@@ -272,21 +355,21 @@ export default function DashboardPage() {
           value={projectsNearingDeadline.length}
           icon="⏳"
           tone={projectsNearingDeadline.length > 0 ? "warn" : "ok"}
-          href="/projects"
+          onClick={openDeadlineDrilldown}
         />
         <KpiCard
           label={`Progetti in partenza (${UPCOMING_START_DAYS}gg)`}
           value={projectsStartingSoon.length}
           icon="🚀"
           tone={projectsStartingSoon.length > 0 ? "warn" : "ok"}
-          href="/projects"
+          onClick={openStartingSoonDrilldown}
         />
         <KpiCard
           label="Progetti senza risorse"
           value={projectsWithoutResources.length}
           icon="🚧"
           tone={projectsWithoutResources.length > 0 ? "danger" : "ok"}
-          href="/projects"
+          onClick={openWithoutResourcesDrilldown}
         />
         <KpiCard label="Capacità libera nel periodo" value={`${freeHoursTotal}h`} icon="🕒" />
         <KpiCard
@@ -304,7 +387,7 @@ export default function DashboardPage() {
           label="Giorni di assenza nel periodo"
           value={totalAbsenceDays}
           icon="🌴"
-          href="/absences"
+          onClick={openAbsencesDrilldown}
         />
       </div>
 
@@ -377,203 +460,83 @@ export default function DashboardPage() {
         </div>
       </Card>
 
-      <Card className="mt-4">
-        <CardHeader>
-          <h2 className="font-semibold text-slate-800 dark:text-slate-100">Utilizzo capacità per progetto</h2>
-          <p className="text-xs text-slate-500 dark:text-slate-400">
-            Quota di capacità totale del team assorbita da ciascun progetto nel periodo
-          </p>
-        </CardHeader>
-        <CardBody className="space-y-3">
-          {projectUtilization.length === 0 ? (
-            <p className="py-4 text-center text-sm text-slate-400 dark:text-slate-500">Nessuna allocazione nel periodo selezionato</p>
-          ) : (
-            projectUtilization.slice(0, 8).map((p) => (
-              <div key={p.projectName} className="px-2 py-1.5">
-                <div className="mb-1 flex items-center justify-between text-sm">
-                  <span className="flex items-center gap-2 text-slate-700 dark:text-slate-200">
-                    <span className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: p.color }} />
-                    {p.projectName}
-                  </span>
-                  <span className="font-semibold text-slate-700 dark:text-slate-200">
-                    {Math.round(p.pctOfTeamCapacity)}% · {Math.round(p.hours)}h
-                  </span>
-                </div>
-                <div className="h-2.5 w-full overflow-hidden rounded-full bg-slate-100 dark:bg-slate-700">
-                  <div
-                    className="h-full rounded-full"
-                    style={{ width: `${Math.min(p.pctOfTeamCapacity, 100)}%`, backgroundColor: p.color }}
-                  />
-                </div>
-              </div>
-            ))
-          )}
-        </CardBody>
-      </Card>
-
-      <Card className="mt-4">
-        <CardHeader>
-          <h2 className="font-semibold text-slate-800 dark:text-slate-100">Progetti per stato</h2>
-          <p className="text-xs text-slate-500 dark:text-slate-400">{projects.length} progetti totali</p>
-        </CardHeader>
-        <CardBody>
-          {projects.length === 0 ? (
-            <p className="py-4 text-center text-sm text-slate-400 dark:text-slate-500">Nessun progetto registrato</p>
-          ) : (
-            <>
-              <div className="flex h-6 w-full overflow-hidden rounded-full">
-                {statusCounts
-                  .filter((s) => s.count > 0)
-                  .map((s, idx, arr) => {
-                    const widthPct = (s.count / projects.length) * 100;
-                    return (
-                      <div
-                        key={s.status}
-                        className="flex h-full items-center justify-center text-[10px] font-medium text-white"
-                        style={{
-                          width: `${widthPct}%`,
-                          backgroundColor: STATUS_COLOR[s.status],
-                          marginRight: idx < arr.length - 1 ? "2px" : 0,
-                        }}
-                        title={`${STATUS_LABEL[s.status]}: ${s.count}`}
-                      >
-                        {widthPct >= 12 ? s.count : ""}
-                      </div>
-                    );
-                  })}
-              </div>
-              <div className="mt-3 flex flex-wrap gap-4 text-xs text-slate-500 dark:text-slate-400">
-                {statusCounts.map((s) => (
-                  <span key={s.status} className="flex items-center gap-1.5">
-                    <span className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: STATUS_COLOR[s.status] }} />
-                    {STATUS_LABEL[s.status]} ({s.count})
-                  </span>
-                ))}
-              </div>
-            </>
-          )}
-        </CardBody>
-      </Card>
-
-      <Card className="mt-4">
-        <CardHeader>
-          <h2 className="font-semibold text-slate-800 dark:text-slate-100">Progetti per tipo di delivery</h2>
-          <p className="text-xs text-slate-500 dark:text-slate-400">TK · T&M · TaaS · AMS</p>
-        </CardHeader>
-        <CardBody>
-          {projects.length === 0 ? (
-            <p className="py-4 text-center text-sm text-slate-400 dark:text-slate-500">Nessun progetto registrato</p>
-          ) : (
-            <>
-              <div className="flex h-6 w-full overflow-hidden rounded-full">
-                {deliveryTypeCounts
-                  .filter((d) => d.count > 0)
-                  .map((d, idx, arr) => {
-                    const widthPct = (d.count / projects.length) * 100;
-                    return (
-                      <div
-                        key={d.type}
-                        className="flex h-full items-center justify-center text-[10px] font-medium text-white"
-                        style={{
-                          width: `${widthPct}%`,
-                          backgroundColor: DELIVERY_COLOR[d.type],
-                          marginRight: idx < arr.length - 1 ? "2px" : 0,
-                        }}
-                        title={`${DELIVERY_LABEL[d.type]}: ${d.count}`}
-                      >
-                        {widthPct >= 12 ? d.count : ""}
-                      </div>
-                    );
-                  })}
-              </div>
-              <div className="mt-3 flex flex-wrap gap-4 text-xs text-slate-500 dark:text-slate-400">
-                {deliveryTypeCounts.map((d) => (
-                  <span key={d.type} className="flex items-center gap-1.5">
-                    <span className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: DELIVERY_COLOR[d.type] }} />
-                    {d.type} ({d.count})
-                  </span>
-                ))}
-              </div>
-            </>
-          )}
-        </CardBody>
-      </Card>
-
-      <div className="mt-4 grid grid-cols-1 gap-4 lg:grid-cols-2">
+      <div className="mt-4 grid grid-cols-1 gap-4 lg:grid-cols-3">
         <Card>
           <CardHeader>
-            <h2 className="font-semibold text-slate-800 dark:text-slate-100">Progetti in scadenza</h2>
-            <p className="text-xs text-slate-500 dark:text-slate-400">Attivi, entro {UPCOMING_DEADLINE_DAYS} giorni</p>
+            <h2 className="font-semibold text-slate-800 dark:text-slate-100">Progetti per stato</h2>
+            <p className="text-xs text-slate-500 dark:text-slate-400">{projects.length} progetti totali</p>
           </CardHeader>
-          <CardBody className="space-y-2">
-            {projectsNearingDeadline.length === 0 && (
-              <p className="py-4 text-center text-sm text-slate-400 dark:text-slate-500">Nessun progetto in scadenza a breve</p>
-            )}
-            {projectsNearingDeadline.map((p) => (
-              <div key={p.id} className="flex items-center justify-between rounded-lg bg-slate-50 dark:bg-slate-700/40 px-3 py-2">
-                <span className="text-sm text-slate-700 dark:text-slate-200">{p.name}</span>
-                <Badge color="#d97706">{p.endDate}</Badge>
-              </div>
-            ))}
+          <CardBody>
+            <DonutChart
+              data={statusCounts.filter((s) => s.count > 0).map((s) => ({ name: STATUS_LABEL[s.status], value: s.count, color: STATUS_COLOR[s.status] }))}
+              onSliceClick={(name) => {
+                const status = STATUS_ORDER.find((s) => STATUS_LABEL[s] === name);
+                if (status) openStatusDrilldown(status);
+              }}
+            />
           </CardBody>
         </Card>
 
         <Card>
           <CardHeader>
-            <h2 className="font-semibold text-slate-800 dark:text-slate-100">Progetti senza risorse</h2>
-            <p className="text-xs text-slate-500 dark:text-slate-400">Attivi, nessuna assegnazione nel periodo</p>
+            <h2 className="font-semibold text-slate-800 dark:text-slate-100">Progetti per tipo di delivery</h2>
+            <p className="text-xs text-slate-500 dark:text-slate-400">TK · T&M · TaaS · AMS</p>
           </CardHeader>
-          <CardBody className="space-y-2">
-            {projectsWithoutResources.length === 0 && (
-              <p className="py-4 text-center text-sm text-slate-400 dark:text-slate-500">Tutti i progetti attivi hanno risorse</p>
-            )}
-            {projectsWithoutResources.map((p) => (
-              <div key={p.id} className="flex items-center justify-between rounded-lg bg-slate-50 dark:bg-slate-700/40 px-3 py-2">
-                <span className="text-sm text-slate-700 dark:text-slate-200">{p.name}</span>
-                <Badge color="#dc2626">{p.client ?? "—"}</Badge>
-              </div>
-            ))}
+          <CardBody>
+            <DonutChart
+              data={deliveryTypeCounts.filter((d) => d.count > 0).map((d) => ({ name: d.type, value: d.count, color: DELIVERY_COLOR[d.type] }))}
+              onSliceClick={(name) => openDeliveryDrilldown(name as DeliveryType)}
+            />
           </CardBody>
         </Card>
 
         <Card>
           <CardHeader>
-            <h2 className="font-semibold text-slate-800 dark:text-slate-100">Progetti in partenza</h2>
-            <p className="text-xs text-slate-500 dark:text-slate-400">Entro {UPCOMING_START_DAYS} giorni</p>
+            <h2 className="font-semibold text-slate-800 dark:text-slate-100">Utilizzo capacità per progetto</h2>
+            <p className="text-xs text-slate-500 dark:text-slate-400">Ore assorbite dal team nel periodo</p>
           </CardHeader>
-          <CardBody className="space-y-2">
-            {projectsStartingSoon.length === 0 && (
-              <p className="py-4 text-center text-sm text-slate-400 dark:text-slate-500">Nessun progetto in partenza a breve</p>
-            )}
-            {projectsStartingSoon.map((p) => (
-              <div key={p.id} className="flex items-center justify-between rounded-lg bg-slate-50 dark:bg-slate-700/40 px-3 py-2">
-                <span className="text-sm text-slate-700 dark:text-slate-200">{p.name}</span>
-                <Badge color="#059669">{p.startDate}</Badge>
-              </div>
-            ))}
-          </CardBody>
-        </Card>
-
-        <Card>
-          <CardHeader>
-            <h2 className="font-semibold text-slate-800 dark:text-slate-100">Assenze nel periodo</h2>
-            <p className="text-xs text-slate-500 dark:text-slate-400">Giorni di ferie/assenza per persona</p>
-          </CardHeader>
-          <CardBody className="space-y-2">
-            {absenceDaysList.length === 0 && (
-              <p className="py-4 text-center text-sm text-slate-400 dark:text-slate-500">Nessuna assenza nel periodo selezionato</p>
-            )}
-            {absenceDaysList.slice(0, 6).map((a) => (
-              <div key={a.personName} className="flex items-center justify-between rounded-lg bg-slate-50 dark:bg-slate-700/40 px-3 py-2">
-                <span className="text-sm text-slate-700 dark:text-slate-200">{a.personName}</span>
-                <Badge color="#0891b2">{a.days} gg</Badge>
-              </div>
-            ))}
+          <CardBody>
+            <DonutChart
+              data={projectUtilization.slice(0, 8).map((p) => ({ name: p.projectName, value: Math.round(p.hours * 10) / 10, color: p.color }))}
+              onSliceClick={openUtilizationDrilldown}
+              valueFormat={(v) => `${v}h`}
+            />
           </CardBody>
         </Card>
       </div>
         </>
       )}
+
+      <Modal open={!!drilldown} onClose={() => setDrilldown(null)} title={drilldown?.title ?? ""}>
+        {drilldown?.subtitle && <p className="mb-3 text-xs text-slate-500 dark:text-slate-400">{drilldown.subtitle}</p>}
+        <div className="space-y-2">
+          {drilldown?.rows.map((r, idx) => {
+            const content = (
+              <>
+                <span className="flex items-center gap-2 text-sm text-slate-700 dark:text-slate-200">
+                  {r.color && <span className="h-2.5 w-2.5 shrink-0 rounded-full" style={{ backgroundColor: r.color }} />}
+                  {r.label}
+                </span>
+                {r.value && <Badge color={r.color ?? "#3457d5"}>{r.value}</Badge>}
+              </>
+            );
+            return r.href ? (
+              <Link
+                key={idx}
+                href={r.href}
+                onClick={() => setDrilldown(null)}
+                className="flex items-center justify-between rounded-lg bg-slate-50 px-3 py-2 hover:bg-slate-100 dark:bg-slate-700/40 dark:hover:bg-slate-700"
+              >
+                {content}
+              </Link>
+            ) : (
+              <div key={idx} className="flex items-center justify-between rounded-lg bg-slate-50 px-3 py-2 dark:bg-slate-700/40">
+                {content}
+              </div>
+            );
+          })}
+        </div>
+      </Modal>
     </div>
   );
 }
@@ -584,6 +547,7 @@ function KpiCard({
   icon,
   tone = "neutral",
   href,
+  onClick,
   trendDelta,
 }: {
   label: string;
@@ -591,6 +555,7 @@ function KpiCard({
   icon: string;
   tone?: "ok" | "warn" | "danger" | "neutral";
   href?: string;
+  onClick?: () => void;
   trendDelta?: number;
 }) {
   const toneColor: Record<string, string> = {
@@ -625,6 +590,13 @@ function KpiCard({
       <Link href={href}>
         <Card className="block transition hover:border-brand-300 hover:shadow-md">{body}</Card>
       </Link>
+    );
+  }
+  if (onClick) {
+    return (
+      <button type="button" onClick={onClick} className="block w-full text-left">
+        <Card className="transition hover:border-brand-300 hover:shadow-md">{body}</Card>
+      </button>
     );
   }
   return <Card>{body}</Card>;

@@ -1,0 +1,1 @@
+ALTER TABLE "people" ADD COLUMN "is_approver" boolean DEFAULT false NOT NULL;

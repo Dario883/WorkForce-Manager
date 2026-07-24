@@ -29,6 +29,7 @@ export default function PersonModal({
   const [role, setRole] = useState("");
   const [capacity, setCapacity] = useState(40);
   const [managerId, setManagerId] = useState<number | "">("");
+  const [isApprover, setIsApprover] = useState(false);
   const [color, setColor] = useState(COLORS[0]);
   const [saving, setSaving] = useState(false);
 
@@ -39,6 +40,7 @@ export default function PersonModal({
       setRole(person.role ?? "");
       setCapacity(person.capacityHoursPerWeek);
       setManagerId(person.managerId ?? "");
+      setIsApprover(person.isApprover);
       setColor(person.avatarColor);
     } else {
       setName("");
@@ -46,11 +48,17 @@ export default function PersonModal({
       setRole("");
       setCapacity(40);
       setManagerId("");
+      setIsApprover(false);
       setColor(COLORS[Math.floor(Math.random() * COLORS.length)]);
     }
   }, [person, open]);
 
-  const managerOptions = people.filter((p) => p.id !== person?.id);
+  // Approvers are the normal pool, but the person's current manager stays
+  // visible in the list even if they've since lost the flag — otherwise the
+  // select would silently show a blank/mismatched value.
+  const managerOptions = people.filter(
+    (p) => p.id !== person?.id && (p.isApprover || p.id === person?.managerId)
+  );
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -61,6 +69,7 @@ export default function PersonModal({
       role: role || null,
       capacityHoursPerWeek: capacity,
       managerId: managerId === "" ? null : managerId,
+      isApprover,
       avatarColor: color,
     };
     try {
@@ -96,6 +105,15 @@ export default function PersonModal({
             onChange={(e) => setCapacity(Number(e.target.value))}
           />
         </Field>
+        <label className="mb-3 flex items-center gap-2 text-sm text-slate-700 dark:text-slate-200">
+          <input
+            type="checkbox"
+            checked={isApprover}
+            onChange={(e) => setIsApprover(e.target.checked)}
+            className="h-4 w-4 rounded border-slate-300 text-brand-600 focus:ring-brand-500 dark:border-slate-600"
+          />
+          È responsabile (selezionabile come responsabile ferie di altre persone)
+        </label>
         <Field label="Responsabile">
           <Select value={managerId} onChange={(e) => setManagerId(e.target.value ? Number(e.target.value) : "")}>
             <option value="">Nessuno</option>

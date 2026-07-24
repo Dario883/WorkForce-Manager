@@ -66,6 +66,7 @@ export const people = pgTable("people", {
   avatarColor: varchar("avatar_color", { length: 32 }).default("#3457d5").notNull(),
   capacityHoursPerWeek: real("capacity_hours_per_week").default(40).notNull(),
   managerId: integer("manager_id").references((): AnyPgColumn => people.id, { onDelete: "set null" }),
+  isApprover: boolean("is_approver").default(false).notNull(),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });

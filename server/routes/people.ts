@@ -16,6 +16,7 @@ const personSchema = z.object({
   avatarColor: z.string().default("#3457d5"),
   capacityHoursPerWeek: z.number().positive().default(40),
   managerId: z.number().int().positive().optional().nullable(),
+  isApprover: z.boolean().default(false),
 });
 
 const managers = alias(people, "managers");
@@ -31,6 +32,7 @@ peopleRouter.get("/", asyncHandler(async (_req, res) => {
       capacityHoursPerWeek: people.capacityHoursPerWeek,
       managerId: people.managerId,
       managerName: managers.name,
+      isApprover: people.isApprover,
       createdAt: people.createdAt,
       updatedAt: people.updatedAt,
     })
@@ -102,6 +104,7 @@ peopleRouter.get("/:id", asyncHandler(async (req, res) => {
       capacityHoursPerWeek: people.capacityHoursPerWeek,
       managerId: people.managerId,
       managerName: managers.name,
+      isApprover: people.isApprover,
       createdAt: people.createdAt,
       updatedAt: people.updatedAt,
     })
