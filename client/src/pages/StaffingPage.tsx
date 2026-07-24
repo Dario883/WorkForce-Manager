@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { api } from "../lib/api";
 import type { Assignment, Person, Project, PeriodType } from "@shared/types";
 import { Card, CardBody } from "../components/Card";
@@ -13,6 +13,7 @@ export default function StaffingPage() {
   const [loading, setLoading] = useState(true);
   const [modalOpen, setModalOpen] = useState(false);
   const [editing, setEditing] = useState<Assignment | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   function load() {
     setLoading(true);
@@ -37,6 +38,17 @@ export default function StaffingPage() {
     load();
   }
 
+  async function handleImport(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const text = await file.text();
+    const result = await api.post<{ imported: number; skipped?: number }>("/assignments/import", { csv: text });
+    const skippedMsg = result.skipped ? ` (${result.skipped} righe saltate per dati non validi)` : "";
+    alert(`Importate ${result.imported} assegnazioni.${skippedMsg}`);
+    load();
+    if (fileInputRef.current) fileInputRef.current.value = "";
+  }
+
   return (
     <div>
       <div className="mb-6 flex items-center justify-between">
@@ -44,15 +56,27 @@ export default function StaffingPage() {
           <h1 className="text-2xl font-bold text-slate-900">Staffing</h1>
           <p className="text-sm text-slate-500">{assignments.length} assegnazioni attive</p>
         </div>
-        <Button
-          onClick={() => {
-            setEditing(null);
-            setModalOpen(true);
-          }}
-          disabled={people.length === 0 || projects.length === 0}
-        >
-          + Nuova assegnazione
-        </Button>
+        <div className="flex gap-2">
+          <Button variant="secondary" onClick={() => window.open("/api/assignments/csv-template", "_blank")}>
+            Template CSV
+          </Button>
+          <Button variant="secondary" onClick={() => window.open("/api/assignments/export", "_blank")}>
+            Esporta CSV
+          </Button>
+          <Button variant="secondary" onClick={() => fileInputRef.current?.click()}>
+            Importa CSV
+          </Button>
+          <input ref={fileInputRef} type="file" accept=".csv" hidden onChange={handleImport} />
+          <Button
+            onClick={() => {
+              setEditing(null);
+              setModalOpen(true);
+            }}
+            disabled={people.length === 0 || projects.length === 0}
+          >
+            + Nuova assegnazione
+          </Button>
+        </div>
       </div>
 
       {(people.length === 0 || projects.length === 0) && (

@@ -1,8 +1,9 @@
 import { Router } from "express";
 import { z } from "zod";
+import Papa from "papaparse";
 import { db } from "../db";
 import { assignments, people, projects } from "../schema";
-import { eq, and, gte, lte } from "drizzle-orm";
+import { eq, and, gte, lte, asc, ilike } from "drizzle-orm";
 import { asyncHandler } from "../asyncHandler";
 import {
   addDays,
@@ -51,6 +52,105 @@ assignmentsRouter.get("/", asyncHandler(async (req, res) => {
     .where(conditions.length ? and(...conditions) : undefined);
 
   res.json(rows);
+}));
+
+assignmentsRouter.get("/csv-template", (_req, res) => {
+  const csv = Papa.unparse({
+    fields: ["personName", "projectName", "percentage", "startDate", "endDate", "periodType"],
+    data: [["Mario Rossi", "Migrazione ERP", "50", "2026-01-01", "2026-06-30", "week"]],
+  });
+  res.header("Content-Type", "text/csv");
+  res.attachment("assignments-template.csv");
+  res.send(csv);
+});
+
+assignmentsRouter.get("/export", asyncHandler(async (_req, res) => {
+  const rows = await db
+    .select({
+      personName: people.name,
+      projectName: projects.name,
+      percentage: assignments.percentage,
+      startDate: assignments.startDate,
+      endDate: assignments.endDate,
+      periodType: assignments.periodType,
+    })
+    .from(assignments)
+    .innerJoin(people, eq(assignments.personId, people.id))
+    .innerJoin(projects, eq(assignments.projectId, projects.id))
+    .orderBy(asc(people.name));
+
+  const csv = Papa.unparse(rows);
+  res.header("Content-Type", "text/csv");
+  res.attachment("assignments-export.csv");
+  res.send(csv);
+}));
+
+const ASSIGNMENT_DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
+const VALID_PERIOD_TYPES = ["day", "week", "month", "year"];
+
+function parseAssignmentDate(raw?: string): string | null {
+  const value = raw?.trim();
+  if (!value) return null;
+  if (ASSIGNMENT_DATE_RE.test(value)) return value;
+  const ddmmyyyy = value.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
+  if (ddmmyyyy) {
+    const [, d, m, y] = ddmmyyyy;
+    return `${y}-${m.padStart(2, "0")}-${d.padStart(2, "0")}`;
+  }
+  return null;
+}
+
+assignmentsRouter.post("/import", asyncHandler(async (req, res) => {
+  const bodySchema = z.object({ csv: z.string() });
+  const parsed = bodySchema.safeParse(req.body);
+  if (!parsed.success) return res.status(400).json({ error: "CSV mancante" });
+
+  const result = Papa.parse(parsed.data.csv, { header: true, skipEmptyLines: true });
+  const rows = result.data as Record<string, string>[];
+
+  let imported = 0;
+  let skipped = 0;
+  for (const row of rows) {
+    const personName = row.personName?.trim();
+    const projectName = row.projectName?.trim();
+    const startDate = parseAssignmentDate(row.startDate);
+    const endDate = parseAssignmentDate(row.endDate);
+    const percentage = Number(row.percentage);
+    const periodTypeRaw = row.periodType?.trim().toLowerCase();
+    const periodType = (VALID_PERIOD_TYPES.includes(periodTypeRaw ?? "") ? periodTypeRaw : "week") as
+      | "day"
+      | "week"
+      | "month"
+      | "year";
+
+    if (!personName || !projectName || !startDate || !endDate || Number.isNaN(percentage)) {
+      skipped++;
+      continue;
+    }
+
+    const [person] = await db.select().from(people).where(ilike(people.name, personName)).limit(1);
+    const [project] = await db.select().from(projects).where(ilike(projects.name, projectName)).limit(1);
+    if (!person || !project) {
+      skipped++;
+      continue;
+    }
+
+    try {
+      await db.insert(assignments).values({
+        personId: person.id,
+        projectId: project.id,
+        percentage,
+        startDate,
+        endDate,
+        periodType,
+      });
+      imported++;
+    } catch (err) {
+      console.error("Errore import assegnazione:", row, err);
+      skipped++;
+    }
+  }
+  res.json({ imported, skipped });
 }));
 
 assignmentsRouter.post("/", asyncHandler(async (req, res) => {
