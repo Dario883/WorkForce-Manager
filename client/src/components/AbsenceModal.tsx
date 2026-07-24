@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { api, ApiError } from "../lib/api";
-import type { Absence, AbsenceType, Person } from "@shared/types";
+import type { Absence, AbsenceStatus, AbsenceType, Person } from "@shared/types";
 import Button from "./Button";
 import Modal from "./Modal";
 import { Field, Input, Select } from "./ui";
@@ -23,6 +23,20 @@ export const ABSENCE_COLOR: Record<AbsenceType, string> = {
   altro: "#64748b",
 };
 
+export const ABSENCE_STATUSES: AbsenceStatus[] = ["in_attesa", "approvata", "rifiutata"];
+
+export const ABSENCE_STATUS_LABEL: Record<AbsenceStatus, string> = {
+  in_attesa: "In attesa",
+  approvata: "Approvata",
+  rifiutata: "Rifiutata",
+};
+
+export const ABSENCE_STATUS_COLOR: Record<AbsenceStatus, string> = {
+  in_attesa: "#d97706",
+  approvata: "#059669",
+  rifiutata: "#dc2626",
+};
+
 // Stable reference, same reasoning as AssignmentModal's NO_PEOPLE:
 // a freshly-allocated `[]` default would retrigger the seeding effect on every render.
 const NO_PEOPLE: Person[] = [];
@@ -33,6 +47,8 @@ export default function AbsenceModal({
   absence,
   people = NO_PEOPLE,
   lockedPerson,
+  defaultStartDate,
+  defaultEndDate,
   onSaved,
 }: {
   open: boolean;
@@ -40,6 +56,8 @@ export default function AbsenceModal({
   absence: Absence | null;
   people?: Person[];
   lockedPerson?: { id: number; name: string };
+  defaultStartDate?: string;
+  defaultEndDate?: string;
   onSaved: () => void;
 }) {
   const [personId, setPersonId] = useState<number | "">("");
@@ -59,11 +77,11 @@ export default function AbsenceModal({
     } else {
       setPersonId(lockedPerson ? lockedPerson.id : people[0]?.id ?? "");
       setType("ferie");
-      setStartDate("");
-      setEndDate("");
+      setStartDate(defaultStartDate ?? "");
+      setEndDate(defaultEndDate ?? "");
       setNotes("");
     }
-  }, [absence, open, people, lockedPerson]);
+  }, [absence, open, people, lockedPerson, defaultStartDate, defaultEndDate]);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();

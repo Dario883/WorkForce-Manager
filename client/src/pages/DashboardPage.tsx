@@ -195,6 +195,7 @@ export default function DashboardPage() {
   const absenceDaysByPerson = new Map<number, { personName: string; days: number }>();
   let totalAbsenceDays = 0;
   for (const a of periodAbsences) {
+    if (a.status === "rifiutata") continue;
     const clippedStart = a.startDate < format(range.start, "yyyy-MM-dd") ? format(range.start, "yyyy-MM-dd") : a.startDate;
     const clippedEnd = a.endDate > format(range.end, "yyyy-MM-dd") ? format(range.end, "yyyy-MM-dd") : a.endDate;
     const days = differenceInCalendarDays(new Date(clippedEnd), new Date(clippedStart)) + 1;

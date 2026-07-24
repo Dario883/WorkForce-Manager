@@ -20,6 +20,7 @@ interface PersonAssignment {
 
 export default function PersonDetailPage({ id }: { id: number }) {
   const [person, setPerson] = useState<Person | null>(null);
+  const [allPeople, setAllPeople] = useState<Person[]>([]);
   const [history, setHistory] = useState<PersonAssignment[]>([]);
   const [capacityPeriods, setCapacityPeriods] = useState<CapacityPeriod[]>([]);
   const [loading, setLoading] = useState(true);
@@ -35,11 +36,13 @@ export default function PersonDetailPage({ id }: { id: number }) {
       api.get<Person>(`/people/${id}`),
       api.get<PersonAssignment[]>(`/people/${id}/assignments`),
       api.get<CapacityPeriod[]>(`/people/${id}/capacity`),
+      api.get<Person[]>("/people"),
     ])
-      .then(([p, a, c]) => {
+      .then(([p, a, c, all]) => {
         setPerson(p);
         setHistory(a.sort((x, y) => (x.startDate < y.startDate ? 1 : -1)));
         setCapacityPeriods(c);
+        setAllPeople(all);
       })
       .finally(() => setLoading(false));
   }
@@ -94,6 +97,7 @@ export default function PersonDetailPage({ id }: { id: number }) {
             <h1 className="text-2xl font-bold text-slate-900 dark:text-slate-100">{person.name}</h1>
             <p className="text-sm text-slate-500 dark:text-slate-400">
               {person.role || "Ruolo non specificato"} · {person.capacityHoursPerWeek}h/settimana
+              {person.managerName && <> · Responsabile: {person.managerName}</>}
             </p>
           </div>
         </div>
@@ -211,6 +215,7 @@ export default function PersonDetailPage({ id }: { id: number }) {
         open={modalOpen}
         onClose={() => setModalOpen(false)}
         person={person}
+        people={allPeople}
         onSaved={() => {
           setModalOpen(false);
           load();

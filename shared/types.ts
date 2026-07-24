@@ -2,6 +2,7 @@ export type ProjectStatus = "planned" | "active" | "on_hold" | "completed";
 export type PeriodType = "day" | "week" | "month" | "year";
 export type DeliveryType = "TK" | "T&M" | "TaaS" | "AMS";
 export type AbsenceType = "ferie" | "malattia" | "permesso" | "formazione" | "altro";
+export type AbsenceStatus = "in_attesa" | "approvata" | "rifiutata";
 
 export interface Person {
   id: number;
@@ -10,6 +11,8 @@ export interface Person {
   role: string | null;
   avatarColor: string;
   capacityHoursPerWeek: number;
+  managerId: number | null;
+  managerName?: string | null;
   createdAt: string;
   updatedAt: string;
 }
@@ -33,11 +36,19 @@ export interface Absence {
   personId: number;
   personName?: string;
   type: AbsenceType;
+  status: AbsenceStatus;
   startDate: string;
   endDate: string;
   notes: string | null;
   createdAt: string;
   updatedAt: string;
+}
+
+export interface Holiday {
+  id: number;
+  date: string;
+  name: string;
+  createdAt: string;
 }
 
 export interface CapacityPeriod {

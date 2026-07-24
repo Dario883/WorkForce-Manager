@@ -4,8 +4,11 @@ import { api } from "../lib/api";
 import type { Assignment, Person, Project } from "@shared/types";
 import { Card, CardBody } from "../components/Card";
 import Button from "../components/Button";
-import { Badge, Input, Select } from "../components/ui";
+import { Badge, Input, Select, SortableTh } from "../components/ui";
 import AssignmentModal from "../components/AssignmentModal";
+import { compareValues, useSortable } from "../lib/sort";
+
+type SortKey = "personName" | "projectName" | "percentage" | "startDate";
 
 export default function StaffingPage() {
   const [assignments, setAssignments] = useState<Assignment[]>([]);
@@ -19,6 +22,7 @@ export default function StaffingPage() {
   const [projectFilter, setProjectFilter] = useState<number | "">("");
   const [activeOn, setActiveOn] = useState("");
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const { sortKey, sortDir, onSort } = useSortable<SortKey>("startDate");
 
   const filteredAssignments = assignments.filter((a) => {
     const q = search.trim().toLowerCase();
@@ -27,6 +31,22 @@ export default function StaffingPage() {
     if (projectFilter !== "" && a.projectId !== projectFilter) return false;
     if (activeOn && (a.startDate > activeOn || a.endDate < activeOn)) return false;
     return true;
+  });
+
+  const sortedAssignments = [...filteredAssignments].sort((a, b) => {
+    const value = (x: Assignment): string | number => {
+      switch (sortKey) {
+        case "personName":
+          return x.personName ?? "";
+        case "projectName":
+          return x.projectName ?? "";
+        case "percentage":
+          return x.percentage;
+        default:
+          return x.startDate;
+      }
+    };
+    return compareValues(value(a), value(b), sortDir);
   });
 
   function load() {
@@ -137,15 +157,15 @@ export default function StaffingPage() {
             <table className="w-full text-sm">
               <thead className="border-b border-slate-100 dark:border-slate-700 text-left text-xs uppercase text-slate-500 dark:text-slate-400">
                 <tr>
-                  <th className="px-5 py-3">Persona</th>
-                  <th className="px-5 py-3">Progetto</th>
-                  <th className="px-5 py-3">%</th>
-                  <th className="px-5 py-3">Periodo</th>
+                  <SortableTh label="Persona" sortKey="personName" currentKey={sortKey} currentDir={sortDir} onSort={onSort} />
+                  <SortableTh label="Progetto" sortKey="projectName" currentKey={sortKey} currentDir={sortDir} onSort={onSort} />
+                  <SortableTh label="%" sortKey="percentage" currentKey={sortKey} currentDir={sortDir} onSort={onSort} />
+                  <SortableTh label="Periodo" sortKey="startDate" currentKey={sortKey} currentDir={sortDir} onSort={onSort} />
                   <th className="px-5 py-3"></th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100 dark:divide-slate-700">
-                {filteredAssignments.map((a) => (
+                {sortedAssignments.map((a) => (
                   <tr key={a.id} className="hover:bg-slate-50 dark:hover:bg-slate-700">
                     <td className="px-5 py-3 font-medium text-slate-800 dark:text-slate-100">
                       <Link href={`/people/${a.personId}`} className="hover:text-brand-600 dark:hover:text-brand-400 hover:underline">

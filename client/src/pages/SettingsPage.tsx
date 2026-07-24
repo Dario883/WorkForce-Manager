@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { api, ApiError } from "../lib/api";
 import { useAuth } from "../lib/auth";
-import type { AppUser, Settings } from "@shared/types";
+import type { AppUser, Holiday, Settings } from "@shared/types";
 import { Card, CardBody, CardHeader } from "../components/Card";
 import Button from "../components/Button";
 import Modal from "../components/Modal";
@@ -80,8 +80,106 @@ export default function SettingsPage() {
         </CardBody>
       </Card>
 
+      <HolidaysSection />
+
       <UsersSection />
     </div>
+  );
+}
+
+function HolidaysSection() {
+  const [holidays, setHolidays] = useState<Holiday[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [date, setDate] = useState("");
+  const [name, setName] = useState("");
+  const [saving, setSaving] = useState(false);
+
+  function load() {
+    setLoading(true);
+    api
+      .get<Holiday[]>("/holidays")
+      .then(setHolidays)
+      .finally(() => setLoading(false));
+  }
+
+  useEffect(load, []);
+
+  async function handleAdd(e: React.FormEvent) {
+    e.preventDefault();
+    setSaving(true);
+    try {
+      await api.post("/holidays", { date, name });
+      setDate("");
+      setName("");
+      load();
+    } catch (err) {
+      alert(err instanceof ApiError ? err.message : "Errore durante il salvataggio della festività.");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function handleDelete(id: number) {
+    if (!confirm("Rimuovere questa festività?")) return;
+    await api.delete(`/holidays/${id}`);
+    load();
+  }
+
+  return (
+    <Card className="mb-6 max-w-2xl">
+      <CardHeader>
+        <h2 className="font-semibold text-slate-800 dark:text-slate-100">Festività aziendali</h2>
+        <p className="text-xs text-slate-500 dark:text-slate-400">
+          Mostrate a tutti nel Calendario, distinte dalle assenze personali.
+        </p>
+      </CardHeader>
+      <CardBody className="border-b border-slate-100 dark:border-slate-700">
+        <form onSubmit={handleAdd} className="grid grid-cols-1 gap-3 sm:grid-cols-3 sm:items-end">
+          <Field label="Data">
+            <Input type="date" required value={date} onChange={(e) => setDate(e.target.value)} />
+          </Field>
+          <Field label="Nome">
+            <Input required value={name} onChange={(e) => setName(e.target.value)} placeholder="es. Ferragosto" />
+          </Field>
+          <Button type="submit" disabled={saving}>
+            {saving ? "Salvataggio…" : "+ Aggiungi"}
+          </Button>
+        </form>
+      </CardBody>
+      <CardBody className="p-0">
+        {loading ? (
+          <p className="p-6 text-center text-sm text-slate-400 dark:text-slate-500">Caricamento…</p>
+        ) : holidays.length === 0 ? (
+          <p className="p-6 text-center text-sm text-slate-400 dark:text-slate-500">Nessuna festività registrata</p>
+        ) : (
+          <table className="w-full text-sm">
+            <thead className="border-b border-slate-100 dark:border-slate-700 text-left text-xs uppercase text-slate-500 dark:text-slate-400">
+              <tr>
+                <th className="px-5 py-3">Data</th>
+                <th className="px-5 py-3">Nome</th>
+                <th className="px-5 py-3"></th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-100 dark:divide-slate-700">
+              {holidays.map((h) => (
+                <tr key={h.id} className="hover:bg-slate-50 dark:hover:bg-slate-700">
+                  <td className="px-5 py-3 text-slate-600 dark:text-slate-300">{h.date}</td>
+                  <td className="px-5 py-3 font-medium text-slate-800 dark:text-slate-100">{h.name}</td>
+                  <td className="px-5 py-3 text-right">
+                    <button
+                      className="text-slate-500 dark:text-slate-400 hover:text-red-600 dark:hover:text-red-400"
+                      onClick={() => handleDelete(h.id)}
+                    >
+                      Rimuovi
+                    </button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        )}
+      </CardBody>
+    </Card>
   );
 }
 

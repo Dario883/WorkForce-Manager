@@ -1,12 +1,22 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Link } from "wouter";
 import { differenceInCalendarDays } from "date-fns";
 import { api } from "../lib/api";
-import type { Absence, AbsenceType, Person } from "@shared/types";
+import type { Absence, AbsenceStatus, AbsenceType, Person } from "@shared/types";
 import { Card, CardBody, CardHeader } from "../components/Card";
 import Button from "../components/Button";
-import { Badge, Select } from "../components/ui";
-import AbsenceModal, { ABSENCE_COLOR, ABSENCE_LABEL, ABSENCE_TYPES } from "../components/AbsenceModal";
+import { Badge, Select, SortableTh } from "../components/ui";
+import AbsenceModal, {
+  ABSENCE_COLOR,
+  ABSENCE_LABEL,
+  ABSENCE_STATUSES,
+  ABSENCE_STATUS_COLOR,
+  ABSENCE_STATUS_LABEL,
+  ABSENCE_TYPES,
+} from "../components/AbsenceModal";
+import { compareValues, useSortable } from "../lib/sort";
+
+type SortKey = "personName" | "type" | "status" | "startDate" | "days";
 
 function daysOf(a: Absence): number {
   return differenceInCalendarDays(new Date(a.endDate), new Date(a.startDate)) + 1;
@@ -20,8 +30,11 @@ export default function AbsencesPage() {
   const [editing, setEditing] = useState<Absence | null>(null);
   const [personFilter, setPersonFilter] = useState<number | "">("");
   const [typeFilter, setTypeFilter] = useState<AbsenceType | "all">("all");
+  const [statusFilter, setStatusFilter] = useState<AbsenceStatus | "all">("all");
   const currentYear = new Date().getFullYear();
   const [yearFilter, setYearFilter] = useState<number>(currentYear);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const { sortKey, sortDir, onSort } = useSortable<SortKey>("startDate");
 
   function load() {
     setLoading(true);
@@ -50,13 +63,33 @@ export default function AbsencesPage() {
   const filtered = absences.filter((a) => {
     if (personFilter !== "" && a.personId !== personFilter) return false;
     if (typeFilter !== "all" && a.type !== typeFilter) return false;
+    if (statusFilter !== "all" && a.status !== statusFilter) return false;
     if (a.endDate < yearStart || a.startDate > yearEnd) return false;
     return true;
+  });
+
+  const sorted = [...filtered].sort((a, b) => {
+    const value = (x: Absence): string | number => {
+      switch (sortKey) {
+        case "personName":
+          return x.personName ?? "";
+        case "type":
+          return ABSENCE_LABEL[x.type];
+        case "status":
+          return ABSENCE_STATUS_LABEL[x.status];
+        case "days":
+          return daysOf(x);
+        default:
+          return x.startDate;
+      }
+    };
+    return compareValues(value(a), value(b), sortDir);
   });
 
   const daysByPerson = useMemo(() => {
     const map = new Map<number, { personName: string; days: number }>();
     for (const a of absences) {
+      if (a.status === "rifiutata") continue;
       if (a.endDate < yearStart || a.startDate > yearEnd) continue;
       const clippedStart = a.startDate < yearStart ? yearStart : a.startDate;
       const clippedEnd = a.endDate > yearEnd ? yearEnd : a.endDate;
@@ -76,6 +109,22 @@ export default function AbsencesPage() {
     load();
   }
 
+  async function handleStatusChange(id: number, status: AbsenceStatus) {
+    await api.put(`/absences/${id}/status`, { status });
+    load();
+  }
+
+  async function handleImport(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const text = await file.text();
+    const result = await api.post<{ imported: number; skipped?: number }>("/absences/import", { csv: text });
+    const skippedMsg = result.skipped ? ` (${result.skipped} righe saltate per dati non validi)` : "";
+    alert(`Importate ${result.imported} assenze.${skippedMsg}`);
+    load();
+    if (fileInputRef.current) fileInputRef.current.value = "";
+  }
+
   return (
     <div>
       <div className="mb-6 flex items-center justify-between">
@@ -83,20 +132,33 @@ export default function AbsencesPage() {
           <h1 className="text-2xl font-bold text-slate-900 dark:text-slate-100">Ferie / Assenze</h1>
           <p className="text-sm text-slate-500 dark:text-slate-400">{absences.length} assenze registrate</p>
         </div>
-        <Button
-          onClick={() => {
-            setEditing(null);
-            setModalOpen(true);
-          }}
-          disabled={people.length === 0}
-        >
-          + Nuova assenza
-        </Button>
+        <div className="flex gap-2">
+          <Button variant="secondary" onClick={() => window.open("/api/absences/csv-template", "_blank")}>
+            Template CSV
+          </Button>
+          <Button variant="secondary" onClick={() => window.open("/api/absences/export", "_blank")}>
+            Esporta CSV
+          </Button>
+          <Button variant="secondary" onClick={() => fileInputRef.current?.click()}>
+            Importa CSV
+          </Button>
+          <input ref={fileInputRef} type="file" accept=".csv" hidden onChange={handleImport} />
+          <Button
+            onClick={() => {
+              setEditing(null);
+              setModalOpen(true);
+            }}
+            disabled={people.length === 0}
+          >
+            + Nuova assenza
+          </Button>
+        </div>
       </div>
 
       <Card className="mb-4">
         <CardHeader>
           <h2 className="font-semibold text-slate-800 dark:text-slate-100">Riepilogo giorni per persona — {yearFilter}</h2>
+          <p className="text-xs text-slate-500 dark:text-slate-400">Esclude le assenze rifiutate</p>
         </CardHeader>
         <CardBody className="space-y-2">
           {daysByPerson.length === 0 ? (
@@ -127,7 +189,7 @@ export default function AbsencesPage() {
         </CardBody>
       </Card>
 
-      <div className="mb-4 grid grid-cols-1 gap-3 sm:grid-cols-3">
+      <div className="mb-4 grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
         <Select value={personFilter} onChange={(e) => setPersonFilter(e.target.value ? Number(e.target.value) : "")}>
           <option value="">Tutte le persone</option>
           {people.map((p) => (
@@ -141,6 +203,14 @@ export default function AbsencesPage() {
           {ABSENCE_TYPES.map((t) => (
             <option key={t} value={t}>
               {ABSENCE_LABEL[t]}
+            </option>
+          ))}
+        </Select>
+        <Select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value as AbsenceStatus | "all")}>
+          <option value="all">Tutti gli stati</option>
+          {ABSENCE_STATUSES.map((s) => (
+            <option key={s} value={s}>
+              {ABSENCE_STATUS_LABEL[s]}
             </option>
           ))}
         </Select>
@@ -165,16 +235,17 @@ export default function AbsencesPage() {
             <table className="w-full text-sm">
               <thead className="border-b border-slate-100 dark:border-slate-700 text-left text-xs uppercase text-slate-500 dark:text-slate-400">
                 <tr>
-                  <th className="px-5 py-3">Persona</th>
-                  <th className="px-5 py-3">Tipo</th>
-                  <th className="px-5 py-3">Periodo</th>
-                  <th className="px-5 py-3">Giorni</th>
+                  <SortableTh label="Persona" sortKey="personName" currentKey={sortKey} currentDir={sortDir} onSort={onSort} />
+                  <SortableTh label="Tipo" sortKey="type" currentKey={sortKey} currentDir={sortDir} onSort={onSort} />
+                  <SortableTh label="Stato" sortKey="status" currentKey={sortKey} currentDir={sortDir} onSort={onSort} />
+                  <SortableTh label="Periodo" sortKey="startDate" currentKey={sortKey} currentDir={sortDir} onSort={onSort} />
+                  <SortableTh label="Giorni" sortKey="days" currentKey={sortKey} currentDir={sortDir} onSort={onSort} />
                   <th className="px-5 py-3">Note</th>
                   <th className="px-5 py-3"></th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100 dark:divide-slate-700">
-                {filtered.map((a) => (
+                {sorted.map((a) => (
                   <tr key={a.id} className="hover:bg-slate-50 dark:hover:bg-slate-700">
                     <td className="px-5 py-3 font-medium text-slate-800 dark:text-slate-100">
                       <Link href={`/people/${a.personId}`} className="hover:text-brand-600 dark:hover:text-brand-400 hover:underline">
@@ -184,12 +255,31 @@ export default function AbsencesPage() {
                     <td className="px-5 py-3">
                       <Badge color={ABSENCE_COLOR[a.type]}>{ABSENCE_LABEL[a.type]}</Badge>
                     </td>
+                    <td className="px-5 py-3">
+                      <Badge color={ABSENCE_STATUS_COLOR[a.status]}>{ABSENCE_STATUS_LABEL[a.status]}</Badge>
+                    </td>
                     <td className="px-5 py-3 text-slate-600 dark:text-slate-300">
                       {a.startDate} → {a.endDate}
                     </td>
                     <td className="px-5 py-3 text-slate-600 dark:text-slate-300">{daysOf(a)}</td>
                     <td className="px-5 py-3 text-slate-600 dark:text-slate-300">{a.notes || "—"}</td>
-                    <td className="px-5 py-3 text-right">
+                    <td className="px-5 py-3 text-right whitespace-nowrap">
+                      {a.status !== "approvata" && (
+                        <button
+                          className="mr-3 text-emerald-600 dark:text-emerald-400 hover:underline"
+                          onClick={() => handleStatusChange(a.id, "approvata")}
+                        >
+                          Approva
+                        </button>
+                      )}
+                      {a.status !== "rifiutata" && (
+                        <button
+                          className="mr-3 text-red-600 dark:text-red-400 hover:underline"
+                          onClick={() => handleStatusChange(a.id, "rifiutata")}
+                        >
+                          Rifiuta
+                        </button>
+                      )}
                       <button
                         className="mr-3 text-slate-500 dark:text-slate-400 hover:text-brand-600 dark:hover:text-brand-400"
                         onClick={() => {

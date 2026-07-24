@@ -1,6 +1,7 @@
 import { Router } from "express";
 import { z } from "zod";
 import Papa from "papaparse";
+import { alias } from "drizzle-orm/pg-core";
 import { db } from "../db";
 import { people, assignments, projects, personCapacityPeriods } from "../schema";
 import { eq, asc, desc } from "drizzle-orm";
@@ -14,10 +15,28 @@ const personSchema = z.object({
   role: z.string().optional().nullable(),
   avatarColor: z.string().default("#3457d5"),
   capacityHoursPerWeek: z.number().positive().default(40),
+  managerId: z.number().int().positive().optional().nullable(),
 });
 
+const managers = alias(people, "managers");
+
 peopleRouter.get("/", asyncHandler(async (_req, res) => {
-  const rows = await db.select().from(people).orderBy(asc(people.name));
+  const rows = await db
+    .select({
+      id: people.id,
+      name: people.name,
+      email: people.email,
+      role: people.role,
+      avatarColor: people.avatarColor,
+      capacityHoursPerWeek: people.capacityHoursPerWeek,
+      managerId: people.managerId,
+      managerName: managers.name,
+      createdAt: people.createdAt,
+      updatedAt: people.updatedAt,
+    })
+    .from(people)
+    .leftJoin(managers, eq(people.managerId, managers.id))
+    .orderBy(asc(people.name));
   res.json(rows);
 }));
 
@@ -73,7 +92,23 @@ peopleRouter.post("/import", asyncHandler(async (req, res) => {
 
 peopleRouter.get("/:id", asyncHandler(async (req, res) => {
   const id = Number(req.params.id);
-  const [person] = await db.select().from(people).where(eq(people.id, id)).limit(1);
+  const [person] = await db
+    .select({
+      id: people.id,
+      name: people.name,
+      email: people.email,
+      role: people.role,
+      avatarColor: people.avatarColor,
+      capacityHoursPerWeek: people.capacityHoursPerWeek,
+      managerId: people.managerId,
+      managerName: managers.name,
+      createdAt: people.createdAt,
+      updatedAt: people.updatedAt,
+    })
+    .from(people)
+    .leftJoin(managers, eq(people.managerId, managers.id))
+    .where(eq(people.id, id))
+    .limit(1);
   if (!person) return res.status(404).json({ error: "Persona non trovata" });
   res.json(person);
 }));
@@ -144,6 +179,9 @@ peopleRouter.put("/:id", asyncHandler(async (req, res) => {
   const id = Number(req.params.id);
   const parsed = personSchema.partial().safeParse(req.body);
   if (!parsed.success) return res.status(400).json({ error: parsed.error.flatten() });
+  if (parsed.data.managerId === id) {
+    return res.status(400).json({ error: "Una persona non può essere responsabile di se stessa" });
+  }
   const [updated] = await db
     .update(people)
     .set({ ...parsed.data, updatedAt: new Date() })

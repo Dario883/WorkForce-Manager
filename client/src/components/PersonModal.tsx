@@ -3,25 +3,32 @@ import { api } from "../lib/api";
 import type { Person } from "@shared/types";
 import Button from "./Button";
 import Modal from "./Modal";
-import { Field, Input } from "./ui";
+import { Field, Input, Select } from "./ui";
 
 const COLORS = ["#3457d5", "#059669", "#d97706", "#dc2626", "#7c3aed", "#0891b2"];
+
+// Stable reference: see AssignmentModal's NO_PEOPLE for why a fresh `[]`
+// default would be unsafe as a useEffect dependency.
+const NO_PEOPLE: Person[] = [];
 
 export default function PersonModal({
   open,
   onClose,
   person,
+  people = NO_PEOPLE,
   onSaved,
 }: {
   open: boolean;
   onClose: () => void;
   person: Person | null;
+  people?: Person[];
   onSaved: () => void;
 }) {
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [role, setRole] = useState("");
   const [capacity, setCapacity] = useState(40);
+  const [managerId, setManagerId] = useState<number | "">("");
   const [color, setColor] = useState(COLORS[0]);
   const [saving, setSaving] = useState(false);
 
@@ -31,15 +38,19 @@ export default function PersonModal({
       setEmail(person.email ?? "");
       setRole(person.role ?? "");
       setCapacity(person.capacityHoursPerWeek);
+      setManagerId(person.managerId ?? "");
       setColor(person.avatarColor);
     } else {
       setName("");
       setEmail("");
       setRole("");
       setCapacity(40);
+      setManagerId("");
       setColor(COLORS[Math.floor(Math.random() * COLORS.length)]);
     }
   }, [person, open]);
+
+  const managerOptions = people.filter((p) => p.id !== person?.id);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -49,6 +60,7 @@ export default function PersonModal({
       email: email || null,
       role: role || null,
       capacityHoursPerWeek: capacity,
+      managerId: managerId === "" ? null : managerId,
       avatarColor: color,
     };
     try {
@@ -83,6 +95,16 @@ export default function PersonModal({
             value={capacity}
             onChange={(e) => setCapacity(Number(e.target.value))}
           />
+        </Field>
+        <Field label="Responsabile">
+          <Select value={managerId} onChange={(e) => setManagerId(e.target.value ? Number(e.target.value) : "")}>
+            <option value="">Nessuno</option>
+            {managerOptions.map((p) => (
+              <option key={p.id} value={p.id}>
+                {p.name}
+              </option>
+            ))}
+          </Select>
         </Field>
         <Field label="Colore">
           <div className="flex gap-2">

@@ -5,8 +5,11 @@ import { api } from "../lib/api";
 import type { Person, Settings, StaffingSnapshot } from "@shared/types";
 import { Card, CardBody } from "../components/Card";
 import Button from "../components/Button";
-import { Badge, Input, Select } from "../components/ui";
+import { Badge, Input, Select, SortableTh } from "../components/ui";
 import PersonModal from "../components/PersonModal";
+import { compareValues, useSortable } from "../lib/sort";
+
+type SortKey = "name" | "role" | "email" | "capacityHoursPerWeek" | "allocation";
 
 function allocationTone(pct: number, under: number, over: number) {
   if (pct === 0) return "#94a3b8";
@@ -25,6 +28,7 @@ export default function PeoplePage() {
   const [search, setSearch] = useState("");
   const [roleFilter, setRoleFilter] = useState("");
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const { sortKey, sortDir, onSort } = useSortable<SortKey>("name");
 
   const roles = [...new Set(people.map((p) => p.role).filter((r): r is string => !!r))].sort();
 
@@ -61,6 +65,24 @@ export default function PeoplePage() {
     const person = snapshot?.people.find((p) => p.personId === personId);
     return person?.days[today]?.total ?? 0;
   }
+
+  const sortedPeople = [...filteredPeople].sort((a, b) => {
+    const value = (p: Person) => {
+      switch (sortKey) {
+        case "role":
+          return p.role ?? "";
+        case "email":
+          return p.email ?? "";
+        case "capacityHoursPerWeek":
+          return p.capacityHoursPerWeek;
+        case "allocation":
+          return allocationFor(p.id);
+        default:
+          return p.name;
+      }
+    };
+    return compareValues(value(a), value(b), sortDir);
+  });
 
   async function handleDelete(id: number) {
     if (!confirm("Eliminare questa persona? L'azione non è reversibile.")) return;
@@ -146,16 +168,28 @@ export default function PeoplePage() {
             <table className="w-full text-sm">
               <thead className="border-b border-slate-100 dark:border-slate-700 text-left text-xs uppercase text-slate-500 dark:text-slate-400">
                 <tr>
-                  <th className="px-5 py-3">Nome</th>
-                  <th className="px-5 py-3">Ruolo</th>
-                  <th className="px-5 py-3">Email</th>
-                  <th className="px-5 py-3">Capacità (h/sett.)</th>
-                  <th className="px-5 py-3">Allocazione oggi</th>
+                  <SortableTh label="Nome" sortKey="name" currentKey={sortKey} currentDir={sortDir} onSort={onSort} />
+                  <SortableTh label="Ruolo" sortKey="role" currentKey={sortKey} currentDir={sortDir} onSort={onSort} />
+                  <SortableTh label="Email" sortKey="email" currentKey={sortKey} currentDir={sortDir} onSort={onSort} />
+                  <SortableTh
+                    label="Capacità (h/sett.)"
+                    sortKey="capacityHoursPerWeek"
+                    currentKey={sortKey}
+                    currentDir={sortDir}
+                    onSort={onSort}
+                  />
+                  <SortableTh
+                    label="Allocazione oggi"
+                    sortKey="allocation"
+                    currentKey={sortKey}
+                    currentDir={sortDir}
+                    onSort={onSort}
+                  />
                   <th className="px-5 py-3"></th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100 dark:divide-slate-700">
-                {filteredPeople.map((p) => (
+                {sortedPeople.map((p) => (
                   <tr key={p.id} className="hover:bg-slate-50 dark:hover:bg-slate-700">
                     <td className="px-5 py-3">
                       <Link href={`/people/${p.id}`} className="flex items-center gap-2 font-medium text-slate-800 dark:text-slate-100 hover:text-brand-600 dark:hover:text-brand-400">
@@ -202,6 +236,7 @@ export default function PeoplePage() {
         open={modalOpen}
         onClose={() => setModalOpen(false)}
         person={editing}
+        people={people}
         onSaved={() => {
           setModalOpen(false);
           load();

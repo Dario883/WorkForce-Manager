@@ -1,11 +1,12 @@
 import { Fragment, useEffect, useState } from "react";
 import { api } from "../lib/api";
-import type { Assignment, Project, StaffingPersonSnapshot, StaffingSnapshot } from "@shared/types";
+import type { Absence, AbsenceType, Assignment, Holiday, Project, StaffingPersonSnapshot, StaffingSnapshot } from "@shared/types";
 import { Card, CardBody } from "../components/Card";
 import Button from "../components/Button";
 import Modal from "../components/Modal";
-import { Field, Input } from "../components/ui";
+import { Field, Input, Select } from "../components/ui";
 import AssignmentModal from "../components/AssignmentModal";
+import AbsenceModal, { ABSENCE_COLOR, ABSENCE_LABEL, ABSENCE_STATUS_LABEL, ABSENCE_TYPES } from "../components/AbsenceModal";
 import {
   addMonths,
   addWeeks,
@@ -27,6 +28,15 @@ import { it } from "date-fns/locale";
 type ViewMode = "week" | "month" | "year";
 type ViewUnit = "percentage" | "hours";
 type EditUnit = "day" | "week" | "month";
+type DataMode = "staffing" | "absences";
+
+const ABSENCE_SHORT: Record<AbsenceType, string> = {
+  ferie: "FER",
+  malattia: "MAL",
+  permesso: "PER",
+  formazione: "FOR",
+  altro: "ALT",
+};
 
 // A column is a single day (week view), a whole week (month view), or a
 // whole month (year view). Editing/creating an assignment always targets
@@ -126,6 +136,25 @@ function snapshotDayForColumn(person: StaffingPersonSnapshot, col: Column) {
   return person.days[col.rangeStart];
 }
 
+function holidayForColumn(col: Column, holidays: Holiday[]): Holiday | null {
+  return holidays.find((h) => h.date >= col.rangeStart && h.date <= col.rangeEnd) ?? null;
+}
+
+// Same "any day in range" logic as snapshotDayForColumn: month/year columns
+// span multiple days, so we surface the first non-rejected absence touching
+// the column rather than requiring every day in the range to be covered.
+function absenceForColumn(personId: number, col: Column, absences: Absence[]): Absence | null {
+  return (
+    absences.find(
+      (a) =>
+        a.personId === personId &&
+        a.status !== "rifiutata" &&
+        a.startDate <= col.rangeEnd &&
+        a.endDate >= col.rangeStart
+    ) ?? null
+  );
+}
+
 type DayCell = { assignmentId: number; percentage: number };
 type ProjectRow = {
   key: string;
@@ -211,11 +240,15 @@ type EditCellTarget = {
 export default function CalendarPage() {
   const [view, setView] = useState<ViewMode>("week");
   const [viewUnit, setViewUnit] = useState<ViewUnit>("percentage");
+  const [dataMode, setDataMode] = useState<DataMode>("staffing");
   const [anchor, setAnchor] = useState(new Date());
   const [snapshot, setSnapshot] = useState<StaffingSnapshot | null>(null);
   const [loading, setLoading] = useState(true);
   const [projects, setProjects] = useState<Project[]>([]);
+  const [holidays, setHolidays] = useState<Holiday[]>([]);
+  const [absences, setAbsences] = useState<Absence[]>([]);
   const [editCell, setEditCell] = useState<EditCellTarget | null>(null);
+  const [editAbsenceCell, setEditAbsenceCell] = useState<EditCellTarget | null>(null);
   const [expanded, setExpanded] = useState<Record<number, boolean>>({});
   const [personAssignments, setPersonAssignments] = useState<Record<number, Assignment[]>>({});
   const [loadingRows, setLoadingRows] = useState<Record<number, boolean>>({});
@@ -232,15 +265,21 @@ export default function CalendarPage() {
     setLoading(true);
     const from = format(range.start, "yyyy-MM-dd");
     const to = format(range.end, "yyyy-MM-dd");
-    api
-      .get<StaffingSnapshot>(`/staffing/snapshot?from=${from}&to=${to}`)
-      .then(setSnapshot)
+    Promise.all([
+      api.get<StaffingSnapshot>(`/staffing/snapshot?from=${from}&to=${to}`),
+      api.get<Absence[]>("/absences"),
+    ])
+      .then(([snap, allAbsences]) => {
+        setSnapshot(snap);
+        setAbsences(allAbsences.filter((a) => a.endDate >= from && a.startDate <= to));
+      })
       .finally(() => setLoading(false));
   }
 
   useEffect(load, [view, anchor.toDateString()]);
   useEffect(() => {
     api.get<Project[]>("/projects").then(setProjects);
+    api.get<Holiday[]>("/holidays").then(setHolidays);
   }, []);
 
   const columns = buildColumns(view, range.start, range.end);
@@ -312,18 +351,33 @@ export default function CalendarPage() {
         </div>
         <div className="flex items-center gap-2">
           <div className="flex rounded-lg border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-800 p-0.5">
-            {(["percentage", "hours"] as ViewUnit[]).map((u) => (
+            {(["staffing", "absences"] as DataMode[]).map((m) => (
               <button
-                key={u}
-                onClick={() => setViewUnit(u)}
+                key={m}
+                onClick={() => setDataMode(m)}
                 className={`rounded-md px-3 py-1.5 text-sm font-medium ${
-                  viewUnit === u ? "bg-brand-500 text-white" : "text-slate-600 dark:text-slate-300"
+                  dataMode === m ? "bg-brand-500 text-white" : "text-slate-600 dark:text-slate-300"
                 }`}
               >
-                {u === "percentage" ? "%" : "Ore"}
+                {m === "staffing" ? "Staffing" : "Ferie/Assenze"}
               </button>
             ))}
           </div>
+          {dataMode === "staffing" && (
+            <div className="flex rounded-lg border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-800 p-0.5">
+              {(["percentage", "hours"] as ViewUnit[]).map((u) => (
+                <button
+                  key={u}
+                  onClick={() => setViewUnit(u)}
+                  className={`rounded-md px-3 py-1.5 text-sm font-medium ${
+                    viewUnit === u ? "bg-brand-500 text-white" : "text-slate-600 dark:text-slate-300"
+                  }`}
+                >
+                  {u === "percentage" ? "%" : "Ore"}
+                </button>
+              ))}
+            </div>
+          )}
           <div className="flex rounded-lg border border-slate-200 bg-white p-0.5 dark:border-slate-600 dark:bg-slate-800">
             {(["week", "month", "year"] as ViewMode[]).map((m) => (
               <button
@@ -364,19 +418,33 @@ export default function CalendarPage() {
                   </th>
                   {columns.map((col) => {
                     const isToday = col.rangeStart <= todayStr && todayStr <= col.rangeEnd;
+                    const holiday = holidayForColumn(col, holidays);
                     return (
                       <th
                         key={col.key}
+                        title={holiday?.name}
                         className={`${
                           view === "month" ? "min-w-[90px]" : view === "year" ? "min-w-[60px]" : "min-w-[70px]"
                         } border-b px-2 py-3 text-center text-xs font-medium ${
-                          isToday
+                          holiday
+                            ? "border-violet-300 bg-violet-50 text-violet-700 dark:border-violet-500 dark:bg-violet-500/10 dark:text-violet-400"
+                            : isToday
                             ? "border-brand-300 bg-brand-50 text-brand-700 dark:border-brand-500 dark:bg-brand-500/10 dark:text-brand-400"
                             : "border-slate-100 text-slate-500 dark:border-slate-700 dark:text-slate-400"
                         }`}
                       >
-                        <div className={isToday ? "font-semibold" : ""}>{col.label1}</div>
-                        <div className={isToday ? "text-brand-500 dark:text-brand-400" : "text-slate-400 dark:text-slate-500"}>{col.label2}</div>
+                        <div className={isToday || holiday ? "font-semibold" : ""}>{col.label1}</div>
+                        <div
+                          className={
+                            holiday
+                              ? "text-violet-500 dark:text-violet-400"
+                              : isToday
+                              ? "text-brand-500 dark:text-brand-400"
+                              : "text-slate-400 dark:text-slate-500"
+                          }
+                        >
+                          {col.label2}
+                        </div>
                       </th>
                     );
                   })}
@@ -384,7 +452,7 @@ export default function CalendarPage() {
                 </tr>
               </thead>
               <tbody>
-                {snapshot.people.map((person) => {
+                {dataMode === "staffing" && snapshot.people.map((person) => {
                   const isExpanded = !!expanded[person.personId];
                   const rows = personAssignments[person.personId] ?? [];
                   const visibleRows = rows.filter(
@@ -550,17 +618,77 @@ export default function CalendarPage() {
                     </Fragment>
                   );
                 })}
+
+                {dataMode === "absences" &&
+                  snapshot.people.map((person) => (
+                    <tr key={person.personId} className="border-b border-slate-50 dark:border-slate-700">
+                      <td className="sticky left-0 z-10 border-r border-slate-100 dark:border-slate-700 bg-white dark:bg-slate-800 px-4 py-2 font-medium text-slate-700 dark:text-slate-200">
+                        {person.personName}
+                      </td>
+                      {columns.map((col) => {
+                        const match = absenceForColumn(person.personId, col, absences);
+                        const isToday = col.rangeStart <= todayStr && todayStr <= col.rangeEnd;
+                        const target: EditCellTarget = {
+                          personId: person.personId,
+                          personName: person.personName,
+                          rangeStart: col.rangeStart,
+                          rangeEnd: col.rangeEnd,
+                          unit: col.unit,
+                        };
+                        return (
+                          <td key={col.key} className={`p-1 text-center ${isToday ? "bg-brand-50/40 dark:bg-brand-500/10" : ""}`}>
+                            <button
+                              onClick={() => setEditAbsenceCell(target)}
+                              className={`h-10 w-full rounded-md text-xs font-semibold transition hover:ring-2 hover:ring-brand-300 ${
+                                match
+                                  ? match.status === "in_attesa"
+                                    ? "border border-dashed"
+                                    : ""
+                                  : "bg-slate-50 text-slate-300 dark:bg-slate-700/40 dark:text-slate-500"
+                              } ${isToday ? "ring-1 ring-brand-400" : ""}`}
+                              style={
+                                match
+                                  ? { backgroundColor: `${ABSENCE_COLOR[match.type]}1a`, color: ABSENCE_COLOR[match.type] }
+                                  : undefined
+                              }
+                              title={match ? `${ABSENCE_LABEL[match.type]} · ${ABSENCE_STATUS_LABEL[match.status]}` : undefined}
+                            >
+                              {match ? ABSENCE_SHORT[match.type] : "—"}
+                            </button>
+                          </td>
+                        );
+                      })}
+                      <td className="border-b border-slate-50 bg-white dark:border-slate-700 dark:bg-slate-800"></td>
+                    </tr>
+                  ))}
               </tbody>
             </table>
           )}
         </CardBody>
       </Card>
 
-      <div className="mt-4 flex items-center gap-4 text-xs text-slate-500 dark:text-slate-400">
-        <LegendDot className="bg-slate-50 dark:bg-slate-700/40" label="0%" />
-        <LegendDot className="bg-amber-50 dark:bg-amber-950" label="< 70% (sotto-allocato)" />
-        <LegendDot className="bg-emerald-50 dark:bg-emerald-950" label="70–100%" />
-        <LegendDot className="bg-red-50 dark:bg-red-950" label="> 100% (sovra-allocato)" />
+      <div className="mt-4 flex flex-wrap items-center gap-4 text-xs text-slate-500 dark:text-slate-400">
+        {dataMode === "staffing" ? (
+          <>
+            <LegendDot className="bg-slate-50 dark:bg-slate-700/40" label="0%" />
+            <LegendDot className="bg-amber-50 dark:bg-amber-950" label="< 70% (sotto-allocato)" />
+            <LegendDot className="bg-emerald-50 dark:bg-emerald-950" label="70–100%" />
+            <LegendDot className="bg-red-50 dark:bg-red-950" label="> 100% (sovra-allocato)" />
+          </>
+        ) : (
+          ABSENCE_TYPES.map((t) => (
+            <span key={t} className="flex items-center gap-1.5">
+              <span className="h-3 w-3 rounded border border-slate-200 dark:border-slate-600" style={{ backgroundColor: `${ABSENCE_COLOR[t]}1a` }} />
+              {ABSENCE_LABEL[t]}
+            </span>
+          ))
+        )}
+        {holidays.length > 0 && (
+          <span className="flex items-center gap-1.5">
+            <span className="h-3 w-3 rounded border border-violet-300 bg-violet-50 dark:border-violet-500 dark:bg-violet-500/10" />
+            Festività
+          </span>
+        )}
       </div>
 
       {editCell && (
@@ -572,6 +700,17 @@ export default function CalendarPage() {
             setEditCell(null);
             load();
             if (expanded[editCell.personId]) loadPersonAssignments(editCell.personId);
+          }}
+        />
+      )}
+
+      {editAbsenceCell && (
+        <EditAbsenceCellModal
+          cell={editAbsenceCell}
+          onClose={() => setEditAbsenceCell(null)}
+          onSaved={() => {
+            setEditAbsenceCell(null);
+            load();
           }}
         />
       )}
@@ -731,6 +870,124 @@ function EditCellModal({
                 {saving ? "Salvataggio…" : "Salva"}
               </Button>
             </div>
+          </div>
+        </div>
+      )}
+    </Modal>
+  );
+}
+
+function EditAbsenceCellModal({
+  cell,
+  onClose,
+  onSaved,
+}: {
+  cell: EditCellTarget;
+  onClose: () => void;
+  onSaved: () => void;
+}) {
+  const [items, setItems] = useState<Absence[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState<number | null>(null);
+  const [showAdd, setShowAdd] = useState(false);
+
+  useEffect(() => {
+    api
+      .get<Absence[]>("/absences")
+      .then((all) => {
+        const active = all.filter(
+          (a) => a.personId === cell.personId && a.startDate <= cell.rangeEnd && a.endDate >= cell.rangeStart
+        );
+        setItems(active);
+      })
+      .finally(() => setLoading(false));
+  }, [cell]);
+
+  async function handleTypeChange(id: number, type: string) {
+    setSaving(id);
+    try {
+      await api.put(`/absences/${id}`, { type });
+      onSaved();
+    } finally {
+      setSaving(null);
+    }
+  }
+
+  async function handleDelete(id: number) {
+    if (!confirm("Rimuovere questa assenza?")) return;
+    await api.delete(`/absences/${id}`);
+    onSaved();
+  }
+
+  if (showAdd) {
+    return (
+      <AbsenceModal
+        open
+        onClose={onClose}
+        absence={null}
+        lockedPerson={{ id: cell.personId, name: cell.personName }}
+        defaultStartDate={cell.rangeStart}
+        defaultEndDate={cell.rangeEnd}
+        onSaved={onSaved}
+      />
+    );
+  }
+
+  const periodLabel = cell.rangeStart === cell.rangeEnd ? cell.rangeStart : `${cell.rangeStart} → ${cell.rangeEnd}`;
+
+  return (
+    <Modal open onClose={onClose} title={`${cell.personName} · ${periodLabel}`}>
+      {loading ? (
+        <p className="text-sm text-slate-400 dark:text-slate-500">Caricamento…</p>
+      ) : items.length === 0 ? (
+        <div>
+          <p className="mb-3 text-sm text-slate-400 dark:text-slate-500">Nessuna assenza in questo periodo.</p>
+          <div className="flex justify-end gap-2">
+            <Button variant="secondary" onClick={onClose}>
+              Chiudi
+            </Button>
+            <Button onClick={() => setShowAdd(true)}>+ Aggiungi assenza</Button>
+          </div>
+        </div>
+      ) : (
+        <div>
+          {items.map((a) => (
+            <div key={a.id} className="mb-3 rounded-lg border border-slate-200 dark:border-slate-600 p-3">
+              <div className="mb-2 flex items-center justify-between text-xs text-slate-500 dark:text-slate-400">
+                <span>
+                  {a.startDate} → {a.endDate}
+                </span>
+                <span>{ABSENCE_STATUS_LABEL[a.status]}</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <Select
+                  value={a.type}
+                  disabled={saving === a.id}
+                  onChange={(e) => handleTypeChange(a.id, e.target.value)}
+                >
+                  {ABSENCE_TYPES.map((t) => (
+                    <option key={t} value={t}>
+                      {ABSENCE_LABEL[t]}
+                    </option>
+                  ))}
+                </Select>
+                <button
+                  className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded text-slate-400 dark:text-slate-500 hover:bg-red-50 hover:text-red-600 dark:hover:bg-red-950 dark:hover:text-red-400"
+                  title="Rimuovi assenza"
+                  onClick={() => handleDelete(a.id)}
+                >
+                  <TrashIcon />
+                </button>
+              </div>
+            </div>
+          ))}
+          <div className="mt-4 flex justify-between gap-2">
+            <Button variant="secondary" onClick={() => setShowAdd(true)}>
+              + Aggiungi altra
+            </Button>
+            <Button variant="secondary" onClick={onClose}>
+              Chiudi
+            </Button>
           </div>
         </div>
       )}

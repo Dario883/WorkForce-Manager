@@ -9,6 +9,7 @@ import {
   real,
   boolean,
   pgEnum,
+  type AnyPgColumn,
 } from "drizzle-orm/pg-core";
 
 export const projectStatusEnum = pgEnum("project_status", [
@@ -40,6 +41,12 @@ export const absenceTypeEnum = pgEnum("absence_type", [
   "altro",
 ]);
 
+export const absenceStatusEnum = pgEnum("absence_status", [
+  "in_attesa",
+  "approvata",
+  "rifiutata",
+]);
+
 // ── Users (auth) ──────────────────────────────────────────────────────────
 export const users = pgTable("users", {
   id: serial("id").primaryKey(),
@@ -58,6 +65,7 @@ export const people = pgTable("people", {
   role: varchar("role", { length: 255 }),
   avatarColor: varchar("avatar_color", { length: 32 }).default("#3457d5").notNull(),
   capacityHoursPerWeek: real("capacity_hours_per_week").default(40).notNull(),
+  managerId: integer("manager_id").references((): AnyPgColumn => people.id, { onDelete: "set null" }),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
@@ -101,11 +109,20 @@ export const absences = pgTable("absences", {
     .references(() => people.id, { onDelete: "cascade" })
     .notNull(),
   type: absenceTypeEnum("type").default("ferie").notNull(),
+  status: absenceStatusEnum("status").default("in_attesa").notNull(),
   startDate: date("start_date").notNull(),
   endDate: date("end_date").notNull(),
   notes: text("notes"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+// ── Holidays (festività aziendali/nazionali condivise) ───────────────────
+export const holidays = pgTable("holidays", {
+  id: serial("id").primaryKey(),
+  date: date("date").notNull().unique(),
+  name: varchar("name", { length: 255 }).notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
 // ── Person capacity periods (capacità variabile nel tempo) ───────────────
@@ -140,3 +157,5 @@ export type Absence = typeof absences.$inferSelect;
 export type InsertAbsence = typeof absences.$inferInsert;
 export type CapacityPeriod = typeof personCapacityPeriods.$inferSelect;
 export type InsertCapacityPeriod = typeof personCapacityPeriods.$inferInsert;
+export type Holiday = typeof holidays.$inferSelect;
+export type InsertHoliday = typeof holidays.$inferInsert;

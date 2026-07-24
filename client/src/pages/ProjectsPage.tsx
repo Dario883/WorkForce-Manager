@@ -4,10 +4,13 @@ import { api } from "../lib/api";
 import type { DeliveryType, Project, ProjectStatus } from "@shared/types";
 import { Card, CardBody } from "../components/Card";
 import Button from "../components/Button";
-import { Badge, Input, Select } from "../components/ui";
+import { Badge, Input, Select, SortableTh } from "../components/ui";
 import ProjectModal, { DELIVERY_COLOR, DELIVERY_LABEL, DELIVERY_TYPES, STATUS_COLOR, STATUS_LABEL } from "../components/ProjectModal";
+import { compareValues, useSortable } from "../lib/sort";
 
 const STATUS_FILTERS: (ProjectStatus | "all")[] = ["all", "planned", "active", "on_hold", "completed"];
+
+type SortKey = "commessaId" | "name" | "client" | "status" | "deliveryType" | "startDate";
 
 export default function ProjectsPage() {
   const [projects, setProjects] = useState<Project[]>([]);
@@ -18,6 +21,7 @@ export default function ProjectsPage() {
   const [statusFilter, setStatusFilter] = useState<ProjectStatus | "all">("all");
   const [deliveryFilter, setDeliveryFilter] = useState<DeliveryType | "all">("all");
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const { sortKey, sortDir, onSort } = useSortable<SortKey>("name");
 
   const filteredProjects = projects.filter((p) => {
     if (statusFilter !== "all" && p.status !== statusFilter) return false;
@@ -29,6 +33,26 @@ export default function ProjectsPage() {
       (p.client ?? "").toLowerCase().includes(q) ||
       p.commessaId.toLowerCase().includes(q)
     );
+  });
+
+  const sortedProjects = [...filteredProjects].sort((a, b) => {
+    const value = (p: Project): string => {
+      switch (sortKey) {
+        case "commessaId":
+          return p.commessaId;
+        case "client":
+          return p.client ?? "";
+        case "status":
+          return STATUS_LABEL[p.status];
+        case "deliveryType":
+          return p.deliveryType;
+        case "startDate":
+          return p.startDate ?? "";
+        default:
+          return p.name;
+      }
+    };
+    return compareValues(value(a), value(b), sortDir);
   });
 
   function load() {
@@ -131,17 +155,17 @@ export default function ProjectsPage() {
             <table className="w-full text-sm">
               <thead className="border-b border-slate-100 dark:border-slate-700 text-left text-xs uppercase text-slate-500 dark:text-slate-400">
                 <tr>
-                  <th className="px-5 py-3">ID Commessa</th>
-                  <th className="px-5 py-3">Progetto</th>
-                  <th className="px-5 py-3">Cliente</th>
-                  <th className="px-5 py-3">Stato</th>
-                  <th className="px-5 py-3">Delivery</th>
-                  <th className="px-5 py-3">Periodo</th>
+                  <SortableTh label="ID Commessa" sortKey="commessaId" currentKey={sortKey} currentDir={sortDir} onSort={onSort} />
+                  <SortableTh label="Progetto" sortKey="name" currentKey={sortKey} currentDir={sortDir} onSort={onSort} />
+                  <SortableTh label="Cliente" sortKey="client" currentKey={sortKey} currentDir={sortDir} onSort={onSort} />
+                  <SortableTh label="Stato" sortKey="status" currentKey={sortKey} currentDir={sortDir} onSort={onSort} />
+                  <SortableTh label="Delivery" sortKey="deliveryType" currentKey={sortKey} currentDir={sortDir} onSort={onSort} />
+                  <SortableTh label="Periodo" sortKey="startDate" currentKey={sortKey} currentDir={sortDir} onSort={onSort} />
                   <th className="px-5 py-3"></th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100 dark:divide-slate-700">
-                {filteredProjects.map((p) => (
+                {sortedProjects.map((p) => (
                   <tr key={p.id} className="hover:bg-slate-50 dark:hover:bg-slate-700">
                     <td className="px-5 py-3 font-mono text-xs text-slate-500 dark:text-slate-400">{p.commessaId}</td>
                     <td className="px-5 py-3 font-medium text-slate-800 dark:text-slate-100">
