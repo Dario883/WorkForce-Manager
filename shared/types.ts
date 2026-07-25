@@ -96,10 +96,24 @@ export interface StaffingSnapshot {
   people: StaffingPersonSnapshot[];
 }
 
+export const APP_TABS = [
+  { key: "dashboard", label: "Dashboard" },
+  { key: "people", label: "Persone" },
+  { key: "projects", label: "Progetti" },
+  { key: "per-pm", label: "Per PM" },
+  { key: "staffing", label: "Staffing" },
+  { key: "calendar", label: "Calendario" },
+  { key: "absences", label: "Ferie/Assenze" },
+  { key: "settings", label: "Impostazioni" },
+] as const;
+
+export type AppTabKey = (typeof APP_TABS)[number]["key"];
+
 export interface AuthUser {
   userId: number;
   email: string;
   name: string;
+  permissions: string[] | null;
 }
 
 export interface AppUser {
@@ -107,6 +121,7 @@ export interface AppUser {
   email: string;
   name: string;
   active: boolean;
+  permissions: string[] | null;
   createdAt: string;
 }
 

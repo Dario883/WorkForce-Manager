@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { api, ApiError } from "../lib/api";
 import { useAuth } from "../lib/auth";
 import type { ActivityLogEntry, AppUser, Holiday, Settings } from "@shared/types";
+import { APP_TABS } from "@shared/types";
 import { Card, CardBody, CardHeader } from "../components/Card";
 import Button from "../components/Button";
 import Modal from "../components/Modal";
@@ -389,6 +390,7 @@ function UsersSection() {
   const [users, setUsers] = useState<AppUser[]>([]);
   const [loading, setLoading] = useState(true);
   const [modalOpen, setModalOpen] = useState(false);
+  const [editing, setEditing] = useState<AppUser | null>(null);
 
   function load() {
     setLoading(true);
@@ -410,12 +412,22 @@ function UsersSection() {
     }
   }
 
+  async function handleDelete(u: AppUser) {
+    if (!confirm(`Eliminare definitivamente l'utente ${u.name}? L'operazione non è reversibile.`)) return;
+    try {
+      await api.delete(`/users/${u.id}`);
+      load();
+    } catch (err) {
+      alert(err instanceof ApiError ? err.message : "Errore durante l'eliminazione dell'utente.");
+    }
+  }
+
   return (
-    <Card className="max-w-2xl">
+    <Card className="max-w-3xl">
       <CardHeader className="flex items-center justify-between">
         <div>
           <h2 className="font-semibold text-slate-800 dark:text-slate-100">Utenti</h2>
-          <p className="text-xs text-slate-500 dark:text-slate-400">Chi può accedere a WorkForce Manager.</p>
+          <p className="text-xs text-slate-500 dark:text-slate-400">Chi può accedere a WorkForce Manager e a quali sezioni.</p>
         </div>
         <Button onClick={() => setModalOpen(true)}>+ Nuovo utente</Button>
       </CardHeader>
@@ -429,6 +441,7 @@ function UsersSection() {
                 <th className="px-5 py-3">Nome</th>
                 <th className="px-5 py-3">Email</th>
                 <th className="px-5 py-3">Stato</th>
+                <th className="px-5 py-3">Permessi</th>
                 <th className="px-5 py-3"></th>
               </tr>
             </thead>
@@ -445,15 +458,36 @@ function UsersSection() {
                     <td className="px-5 py-3">
                       <Badge color={u.active ? "#059669" : "#64748b"}>{u.active ? "Attivo" : "Disattivato"}</Badge>
                     </td>
+                    <td className="px-5 py-3">
+                      <Badge color={u.permissions ? "#c98500" : "#3987e5"}>
+                        {u.permissions ? `${u.permissions.length}/${APP_TABS.length} sezioni` : "Tutte le sezioni"}
+                      </Badge>
+                    </td>
                     <td className="px-5 py-3 text-right">
-                      <button
-                        className={`${isSelf ? "cursor-not-allowed text-slate-300" : "text-slate-500 dark:text-slate-400 hover:text-brand-600 dark:hover:text-brand-400"}`}
-                        disabled={isSelf}
-                        title={isSelf ? "Non puoi disattivare il tuo stesso account" : undefined}
-                        onClick={() => handleToggleActive(u)}
-                      >
-                        {u.active ? "Disattiva" : "Riattiva"}
-                      </button>
+                      <div className="flex justify-end gap-3">
+                        <button
+                          className="text-slate-500 dark:text-slate-400 hover:text-brand-600 dark:hover:text-brand-400"
+                          onClick={() => setEditing(u)}
+                        >
+                          Modifica
+                        </button>
+                        <button
+                          className={`${isSelf ? "cursor-not-allowed text-slate-300 dark:text-slate-600" : "text-slate-500 dark:text-slate-400 hover:text-brand-600 dark:hover:text-brand-400"}`}
+                          disabled={isSelf}
+                          title={isSelf ? "Non puoi disattivare il tuo stesso account" : undefined}
+                          onClick={() => handleToggleActive(u)}
+                        >
+                          {u.active ? "Disattiva" : "Riattiva"}
+                        </button>
+                        <button
+                          className={`${isSelf ? "cursor-not-allowed text-slate-300 dark:text-slate-600" : "text-slate-500 dark:text-slate-400 hover:text-red-600 dark:hover:text-red-400"}`}
+                          disabled={isSelf}
+                          title={isSelf ? "Non puoi eliminare il tuo stesso account" : undefined}
+                          onClick={() => handleDelete(u)}
+                        >
+                          Elimina
+                        </button>
+                      </div>
                     </td>
                   </tr>
                 );
@@ -471,7 +505,132 @@ function UsersSection() {
           load();
         }}
       />
+
+      <EditUserModal
+        user={editing}
+        isSelf={editing !== null && currentUser?.userId === editing.id}
+        onClose={() => setEditing(null)}
+        onSaved={() => {
+          setEditing(null);
+          load();
+        }}
+      />
     </Card>
+  );
+}
+
+function EditUserModal({
+  user,
+  isSelf,
+  onClose,
+  onSaved,
+}: {
+  user: AppUser | null;
+  isSelf: boolean;
+  onClose: () => void;
+  onSaved: () => void;
+}) {
+  const [name, setName] = useState("");
+  const [permissions, setPermissions] = useState<string[] | null>(null);
+  const [password, setPassword] = useState("");
+  const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    if (user) {
+      setName(user.name);
+      setPermissions(user.permissions);
+      setPassword("");
+    }
+  }, [user]);
+
+  if (!user) return null;
+
+  const allTabs = APP_TABS.map((t) => t.key);
+  const hasFullAccess = permissions === null;
+
+  function toggleTab(key: string) {
+    setPermissions((prev) => {
+      const current = prev ?? allTabs;
+      const next = current.includes(key) ? current.filter((k) => k !== key) : [...current, key];
+      return next;
+    });
+  }
+
+  async function handleSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    setSaving(true);
+    try {
+      const body: Record<string, unknown> = { name, permissions };
+      if (password) body.password = password;
+      await api.put(`/users/${user!.id}`, body);
+      onSaved();
+    } catch (err) {
+      alert(err instanceof ApiError ? err.message : "Errore durante il salvataggio dell'utente.");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <Modal open={!!user} onClose={onClose} title={`Modifica utente — ${user.email}`}>
+      <form onSubmit={handleSubmit}>
+        <Field label="Nome">
+          <Input required value={name} onChange={(e) => setName(e.target.value)} />
+        </Field>
+        <Field label="Nuova password (lascia vuoto per non modificarla)">
+          <Input type="password" minLength={8} value={password} onChange={(e) => setPassword(e.target.value)} />
+        </Field>
+
+        <div className="mt-4">
+          <div className="mb-2 flex items-center justify-between">
+            <span className="text-sm font-medium text-slate-700 dark:text-slate-200">Sezioni accessibili</span>
+            <button
+              type="button"
+              className="text-xs font-medium text-brand-600 dark:text-brand-400 hover:underline"
+              onClick={() => setPermissions(hasFullAccess ? [] : null)}
+            >
+              {hasFullAccess ? "Personalizza" : "Concedi tutte"}
+            </button>
+          </div>
+          <div className="grid grid-cols-2 gap-2 rounded-lg border border-slate-200 p-3 dark:border-slate-600">
+            {APP_TABS.map((t) => {
+              const checked = hasFullAccess || (permissions?.includes(t.key) ?? false);
+              const isSettingsLockedForSelf = isSelf && t.key === "settings";
+              return (
+                <label
+                  key={t.key}
+                  className={`flex items-center gap-2 text-sm ${
+                    isSettingsLockedForSelf ? "text-slate-400 dark:text-slate-500" : "text-slate-700 dark:text-slate-200"
+                  }`}
+                >
+                  <input
+                    type="checkbox"
+                    checked={checked}
+                    disabled={hasFullAccess || isSettingsLockedForSelf}
+                    onChange={() => toggleTab(t.key)}
+                  />
+                  {t.label}
+                </label>
+              );
+            })}
+          </div>
+          {isSelf && (
+            <p className="mt-1 text-xs text-slate-400 dark:text-slate-500">
+              Non puoi rimuovere il tuo stesso accesso a Impostazioni.
+            </p>
+          )}
+        </div>
+
+        <div className="mt-4 flex justify-end gap-2">
+          <Button type="button" variant="secondary" onClick={onClose}>
+            Annulla
+          </Button>
+          <Button type="submit" disabled={saving}>
+            {saving ? "Salvataggio…" : "Salva modifiche"}
+          </Button>
+        </div>
+      </form>
+    </Modal>
   );
 }
 

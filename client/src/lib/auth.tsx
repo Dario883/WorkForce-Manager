@@ -7,6 +7,7 @@ interface AuthContextValue {
   loading: boolean;
   login: (email: string, password: string) => Promise<void>;
   logout: () => Promise<void>;
+  can: (tab: string) => boolean;
 }
 
 const AuthContext = createContext<AuthContextValue | null>(null);
@@ -24,11 +25,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   async function login(email: string, password: string) {
-    const loggedUser = await api.post<{ id: number; email: string; name: string }>("/auth/login", {
-      email,
-      password,
+    const loggedUser = await api.post<{ id: number; email: string; name: string; permissions: string[] | null }>(
+      "/auth/login",
+      { email, password }
+    );
+    setUser({
+      userId: loggedUser.id,
+      email: loggedUser.email,
+      name: loggedUser.name,
+      permissions: loggedUser.permissions,
     });
-    setUser({ userId: loggedUser.id, email: loggedUser.email, name: loggedUser.name });
   }
 
   async function logout() {
@@ -36,8 +42,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setUser(null);
   }
 
+  function can(tab: string) {
+    return !user?.permissions || user.permissions.includes(tab);
+  }
+
   return (
-    <AuthContext.Provider value={{ user, loading, login, logout }}>{children}</AuthContext.Provider>
+    <AuthContext.Provider value={{ user, loading, login, logout, can }}>{children}</AuthContext.Provider>
   );
 }
 

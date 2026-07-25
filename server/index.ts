@@ -4,7 +4,7 @@ import type { NextFunction, Request, Response } from "express";
 import cookieParser from "cookie-parser";
 import path from "path";
 import { fileURLToPath } from "url";
-import { attachUser, requireAuth } from "./auth";
+import { attachUser, requireAuth, requireTab, requireTabWrite } from "./auth";
 import { asyncHandler } from "./asyncHandler";
 import { authRouter } from "./routes/auth";
 import { peopleRouter } from "./routes/people";
@@ -31,16 +31,18 @@ app.use(asyncHandler(attachUser));
 // Public
 app.use("/api/auth", authRouter);
 
-// Protected
-app.use("/api/people", requireAuth, peopleRouter);
-app.use("/api/projects", requireAuth, projectsRouter);
-app.use("/api/assignments", requireAuth, assignmentsRouter);
+// Protected — reads stay open across tabs (shared dashboards/aggregations
+// depend on them), writes are gated per-tab; /users and /activity are only
+// ever consumed by the Impostazioni tab, so they're fully gated.
+app.use("/api/people", requireAuth, requireTabWrite("people"), peopleRouter);
+app.use("/api/projects", requireAuth, requireTabWrite("projects"), projectsRouter);
+app.use("/api/assignments", requireAuth, requireTabWrite("staffing"), assignmentsRouter);
 app.use("/api/staffing", requireAuth, staffingRouter);
-app.use("/api/settings", requireAuth, settingsRouter);
-app.use("/api/users", requireAuth, usersRouter);
-app.use("/api/absences", requireAuth, absencesRouter);
-app.use("/api/holidays", requireAuth, holidaysRouter);
-app.use("/api/activity", requireAuth, activityRouter);
+app.use("/api/settings", requireAuth, requireTabWrite("settings"), settingsRouter);
+app.use("/api/users", requireAuth, requireTab("settings"), usersRouter);
+app.use("/api/absences", requireAuth, requireTabWrite("absences"), absencesRouter);
+app.use("/api/holidays", requireAuth, requireTabWrite("settings"), holidaysRouter);
+app.use("/api/activity", requireAuth, requireTab("settings"), activityRouter);
 
 if (process.env.NODE_ENV === "production") {
   const publicDir = path.join(__dirname, "public");

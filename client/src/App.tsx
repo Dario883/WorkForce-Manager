@@ -14,14 +14,25 @@ import AbsencesPage from "./pages/AbsencesPage";
 import PMOverviewPage from "./pages/PMOverviewPage";
 import SettingsPage from "./pages/SettingsPage";
 
-function Protected({ children }: { children: React.ReactNode }) {
-  const { user, loading } = useAuth();
+function Protected({ tab, children }: { tab?: string; children: React.ReactNode }) {
+  const { user, loading, can } = useAuth();
   if (loading) {
     return (
       <div className="flex h-screen items-center justify-center text-slate-400">Caricamento…</div>
     );
   }
   if (!user) return <Redirect to="/login" />;
+  if (tab && !can(tab)) {
+    return (
+      <Layout>
+        <div className="flex flex-col items-center justify-center gap-2 py-24 text-center text-slate-400 dark:text-slate-500">
+          <span className="text-3xl">🔒</span>
+          <p className="font-medium text-slate-600 dark:text-slate-300">Non hai accesso a questa sezione</p>
+          <p className="text-sm">Contatta un amministratore per richiedere i permessi.</p>
+        </div>
+      </Layout>
+    );
+  }
   return <>{children}</>;
 }
 
@@ -30,14 +41,14 @@ function AppRoutes() {
     <Switch>
       <Route path="/login" component={LoginPage} />
       <Route path="/">
-        <Protected>
+        <Protected tab="dashboard">
           <Layout>
             <DashboardPage />
           </Layout>
         </Protected>
       </Route>
       <Route path="/people">
-        <Protected>
+        <Protected tab="people">
           <Layout>
             <PeoplePage />
           </Layout>
@@ -45,7 +56,7 @@ function AppRoutes() {
       </Route>
       <Route path="/people/:id">
         {(params) => (
-          <Protected>
+          <Protected tab="people">
             <Layout>
               <PersonDetailPage id={Number(params.id)} />
             </Layout>
@@ -53,7 +64,7 @@ function AppRoutes() {
         )}
       </Route>
       <Route path="/projects">
-        <Protected>
+        <Protected tab="projects">
           <Layout>
             <ProjectsPage />
           </Layout>
@@ -61,7 +72,7 @@ function AppRoutes() {
       </Route>
       <Route path="/projects/:id">
         {(params) => (
-          <Protected>
+          <Protected tab="projects">
             <Layout>
               <ProjectDetailPage id={Number(params.id)} />
             </Layout>
@@ -69,35 +80,35 @@ function AppRoutes() {
         )}
       </Route>
       <Route path="/staffing">
-        <Protected>
+        <Protected tab="staffing">
           <Layout>
             <StaffingPage />
           </Layout>
         </Protected>
       </Route>
       <Route path="/calendar">
-        <Protected>
+        <Protected tab="calendar">
           <Layout>
             <CalendarPage />
           </Layout>
         </Protected>
       </Route>
       <Route path="/absences">
-        <Protected>
+        <Protected tab="absences">
           <Layout>
             <AbsencesPage />
           </Layout>
         </Protected>
       </Route>
       <Route path="/per-pm">
-        <Protected>
+        <Protected tab="per-pm">
           <Layout>
             <PMOverviewPage />
           </Layout>
         </Protected>
       </Route>
       <Route path="/settings">
-        <Protected>
+        <Protected tab="settings">
           <Layout>
             <SettingsPage />
           </Layout>

@@ -15,6 +15,10 @@ export interface AuthPayload {
   name: string;
 }
 
+export interface RequestUser extends AuthPayload {
+  permissions: string[] | null;
+}
+
 export async function hashPassword(password: string) {
   return bcrypt.hash(password, 10);
 }
@@ -53,7 +57,7 @@ declare global {
   // eslint-disable-next-line @typescript-eslint/no-namespace
   namespace Express {
     interface Request {
-      user?: AuthPayload;
+      user?: RequestUser;
     }
   }
 }
@@ -73,8 +77,12 @@ export function readSessionFromRequest(req: Request): AuthPayload | null {
 export async function attachUser(req: Request, _res: Response, next: NextFunction) {
   const session = readSessionFromRequest(req);
   if (session) {
-    const [row] = await db.select({ active: users.active }).from(users).where(eq(users.id, session.userId)).limit(1);
-    if (row?.active) req.user = session;
+    const [row] = await db
+      .select({ active: users.active, permissions: users.permissions })
+      .from(users)
+      .where(eq(users.id, session.userId))
+      .limit(1);
+    if (row?.active) req.user = { ...session, permissions: row.permissions ?? null };
   }
   next();
 }
@@ -85,6 +93,31 @@ export function requireAuth(req: Request, res: Response, next: NextFunction) {
     return res.status(401).json({ error: "Non autenticato" });
   }
   next();
+}
+
+/**
+ * Blocks the request with 403 unless the user's permissions include `tab`.
+ * `permissions === null` means unrestricted (full access) — the default for
+ * every user until an admin explicitly narrows it via Impostazioni > Utenti.
+ */
+export function requireTab(tab: string) {
+  return (req: Request, res: Response, next: NextFunction) => {
+    if (req.user?.permissions && !req.user.permissions.includes(tab)) {
+      return res.status(403).json({ error: "Non hai i permessi per accedere a questa sezione" });
+    }
+    next();
+  };
+}
+
+/** Like requireTab, but only enforced for non-GET (mutating) requests, so
+ * shared read-only data (used by other tabs' dashboards/aggregations) stays
+ * available even to users without write access to this tab. */
+export function requireTabWrite(tab: string) {
+  const gate = requireTab(tab);
+  return (req: Request, res: Response, next: NextFunction) => {
+    if (req.method === "GET") return next();
+    return gate(req, res, next);
+  };
 }
 
 export const SESSION_COOKIE_NAME = COOKIE_NAME;

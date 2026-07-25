@@ -8,6 +8,7 @@ import {
   date,
   real,
   boolean,
+  jsonb,
   pgEnum,
   type AnyPgColumn,
 } from "drizzle-orm/pg-core";
@@ -54,6 +55,10 @@ export const users = pgTable("users", {
   passwordHash: text("password_hash").notNull(),
   name: varchar("name", { length: 255 }).notNull(),
   active: boolean("active").notNull().default(true),
+  // Tab keys (see shared/types.ts APP_TABS) this user is restricted to.
+  // null = unrestricted (full access) — the default, so existing/new users
+  // keep working normally until an admin explicitly narrows their access.
+  permissions: jsonb("permissions").$type<string[] | null>(),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 

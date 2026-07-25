@@ -37,7 +37,7 @@ authRouter.post("/login", asyncHandler(async (req, res) => {
 
   const token = signSession({ userId: user.id, email: user.email, name: user.name });
   setSessionCookie(res, token);
-  res.json({ id: user.id, email: user.email, name: user.name });
+  res.json({ id: user.id, email: user.email, name: user.name, permissions: user.permissions ?? null });
 }));
 
 authRouter.post("/logout", (_req, res) => {

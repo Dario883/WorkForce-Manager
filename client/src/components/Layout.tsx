@@ -6,14 +6,14 @@ import { api } from "../lib/api";
 import type { Person, Project } from "@shared/types";
 
 const NAV = [
-  { href: "/", label: "Dashboard", icon: "📊" },
-  { href: "/people", label: "Persone", icon: "👥" },
-  { href: "/projects", label: "Progetti", icon: "📁" },
-  { href: "/per-pm", label: "Per PM", icon: "🗂️" },
-  { href: "/staffing", label: "Staffing", icon: "🧩" },
-  { href: "/calendar", label: "Calendario", icon: "📅" },
-  { href: "/absences", label: "Ferie/Assenze", icon: "🌴" },
-  { href: "/settings", label: "Impostazioni", icon: "⚙️" },
+  { href: "/", label: "Dashboard", icon: "📊", tab: "dashboard" },
+  { href: "/people", label: "Persone", icon: "👥", tab: "people" },
+  { href: "/projects", label: "Progetti", icon: "📁", tab: "projects" },
+  { href: "/per-pm", label: "Per PM", icon: "🗂️", tab: "per-pm" },
+  { href: "/staffing", label: "Staffing", icon: "🧩", tab: "staffing" },
+  { href: "/calendar", label: "Calendario", icon: "📅", tab: "calendar" },
+  { href: "/absences", label: "Ferie/Assenze", icon: "🌴", tab: "absences" },
+  { href: "/settings", label: "Impostazioni", icon: "⚙️", tab: "settings" },
 ];
 
 function GlobalSearch() {
@@ -108,7 +108,7 @@ function GlobalSearch() {
 
 export default function Layout({ children }: { children: ReactNode }) {
   const [location] = useLocation();
-  const { user, logout } = useAuth();
+  const { user, logout, can } = useAuth();
   const { theme, toggleTheme } = useTheme();
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
 
@@ -137,7 +137,7 @@ export default function Layout({ children }: { children: ReactNode }) {
         <GlobalSearch />
 
         <nav className="flex-1 space-y-1 overflow-y-auto p-3">
-          {NAV.map((item) => {
+          {NAV.filter((item) => can(item.tab)).map((item) => {
             const active = item.href === "/" ? location === "/" : location.startsWith(item.href);
             return (
               <Link
