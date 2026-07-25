@@ -392,59 +392,76 @@ export default function DashboardPage() {
         <p className="text-slate-400 dark:text-slate-500">Caricamento…</p>
       ) : (
         <>
-      <div className="mb-6 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-5">
-        <KpiCard label="Persone" value={people.length} icon="👥" href="/people" />
-        <KpiCard label="Progetti attivi" value={activeProjects.length} icon="📁" href="/projects" />
-        <KpiCard
-          label="Persone fuori soglia"
-          value={outOfThresholdCount}
-          icon="⚖️"
-          tone={outOfThresholdCount > 0 ? "warn" : "ok"}
-          onClick={openOutOfThresholdDrilldown}
-          trendDelta={outOfThresholdDelta}
-        />
-        <KpiCard
-          label={`Progetti in scadenza (${UPCOMING_DEADLINE_DAYS}gg)`}
-          value={projectsNearingDeadline.length}
-          icon="⏳"
-          tone={projectsNearingDeadline.length > 0 ? "warn" : "ok"}
-          onClick={openDeadlineDrilldown}
-        />
-        <KpiCard
-          label={`Progetti in partenza (${UPCOMING_START_DAYS}gg)`}
-          value={projectsStartingSoon.length}
-          icon="🚀"
-          tone={projectsStartingSoon.length > 0 ? "warn" : "ok"}
-          onClick={openStartingSoonDrilldown}
-        />
-        <KpiCard
-          label="Progetti senza risorse"
-          value={projectsWithoutResources.length}
-          icon="🚧"
-          tone={projectsWithoutResources.length > 0 ? "danger" : "ok"}
-          onClick={openWithoutResourcesDrilldown}
-        />
-        <KpiCard
-          label="Allocazione media team"
-          value={`${Math.round(teamAvg)}%`}
-          icon="📊"
-          trendDelta={teamAvgDelta}
-        />
-        <KpiCard label="Capacità libera / FTE" value={`${freeHoursTotal}h · ${fteAllocated.toFixed(1)}/${fteTotal.toFixed(1)} FTE`} icon="🧮" />
-        <KpiCard
-          label="Giorni di assenza nel periodo"
-          value={totalAbsenceDays}
-          icon="🌴"
-          onClick={openAbsencesDrilldown}
-          trendDelta={absenceDaysDelta}
-        />
-        <KpiCard
-          label="Richieste ferie in attesa"
-          value={pendingApprovals.length}
-          icon="📝"
-          tone={pendingApprovals.length > 0 ? "warn" : "ok"}
-          onClick={openPendingApprovalsDrilldown}
-        />
+      <div className="mb-6 space-y-5">
+        <div>
+          <h3 className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-400 dark:text-slate-500">Team</h3>
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+            <KpiCard label="Persone" value={people.length} icon="👥" href="/people" />
+            <KpiCard
+              label="Persone fuori soglia"
+              value={outOfThresholdCount}
+              icon="⚖️"
+              tone={outOfThresholdCount > 0 ? "warn" : "ok"}
+              onClick={openOutOfThresholdDrilldown}
+              trendDelta={outOfThresholdDelta}
+            />
+            <KpiCard
+              label="Allocazione media team"
+              value={`${Math.round(teamAvg)}%`}
+              icon="📊"
+              trendDelta={teamAvgDelta}
+            />
+            <KpiCard label="Capacità libera / FTE" value={`${freeHoursTotal}h · ${fteAllocated.toFixed(1)}/${fteTotal.toFixed(1)} FTE`} icon="🧮" />
+          </div>
+        </div>
+
+        <div>
+          <h3 className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-400 dark:text-slate-500">Progetti</h3>
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+            <KpiCard label="Progetti attivi" value={activeProjects.length} icon="📁" href="/projects" />
+            <KpiCard
+              label={`In scadenza (${UPCOMING_DEADLINE_DAYS}gg)`}
+              value={projectsNearingDeadline.length}
+              icon="⏳"
+              tone={projectsNearingDeadline.length > 0 ? "warn" : "ok"}
+              onClick={openDeadlineDrilldown}
+            />
+            <KpiCard
+              label={`In partenza (${UPCOMING_START_DAYS}gg)`}
+              value={projectsStartingSoon.length}
+              icon="🚀"
+              tone={projectsStartingSoon.length > 0 ? "warn" : "ok"}
+              onClick={openStartingSoonDrilldown}
+            />
+            <KpiCard
+              label="Senza risorse"
+              value={projectsWithoutResources.length}
+              icon="🚧"
+              tone={projectsWithoutResources.length > 0 ? "danger" : "ok"}
+              onClick={openWithoutResourcesDrilldown}
+            />
+          </div>
+        </div>
+
+        <div>
+          <h3 className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-400 dark:text-slate-500">Ferie</h3>
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+            <KpiCard
+              label="Giorni di assenza nel periodo"
+              value={totalAbsenceDays}
+              icon="🌴"
+              onClick={openAbsencesDrilldown}
+              trendDelta={absenceDaysDelta}
+            />
+            <KpiCard
+              label="Richieste in attesa"
+              value={pendingApprovals.length}
+              icon="📝"
+              tone={pendingApprovals.length > 0 ? "warn" : "ok"}
+              onClick={openPendingApprovalsDrilldown}
+            />
+          </div>
+        </div>
       </div>
 
       <Card>

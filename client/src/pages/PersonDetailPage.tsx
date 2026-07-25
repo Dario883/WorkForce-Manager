@@ -1,11 +1,13 @@
 import { useEffect, useState } from "react";
 import { Link } from "wouter";
+import { format } from "date-fns";
 import { api, ApiError } from "../lib/api";
-import type { CapacityPeriod, Person } from "@shared/types";
+import type { Absence, CapacityPeriod, Person } from "@shared/types";
 import { Card, CardBody, CardHeader } from "../components/Card";
 import Button from "../components/Button";
 import { Badge, Field, Input } from "../components/ui";
 import PersonModal from "../components/PersonModal";
+import { ABSENCE_COLOR, ABSENCE_LABEL, ABSENCE_STATUS_COLOR, ABSENCE_STATUS_LABEL } from "../components/AbsenceModal";
 
 interface PersonAssignment {
   id: number;
@@ -22,6 +24,7 @@ export default function PersonDetailPage({ id }: { id: number }) {
   const [person, setPerson] = useState<Person | null>(null);
   const [allPeople, setAllPeople] = useState<Person[]>([]);
   const [history, setHistory] = useState<PersonAssignment[]>([]);
+  const [absences, setAbsences] = useState<Absence[]>([]);
   const [capacityPeriods, setCapacityPeriods] = useState<CapacityPeriod[]>([]);
   const [loading, setLoading] = useState(true);
   const [modalOpen, setModalOpen] = useState(false);
@@ -37,12 +40,14 @@ export default function PersonDetailPage({ id }: { id: number }) {
       api.get<PersonAssignment[]>(`/people/${id}/assignments`),
       api.get<CapacityPeriod[]>(`/people/${id}/capacity`),
       api.get<Person[]>("/people"),
+      api.get<Absence[]>("/absences"),
     ])
-      .then(([p, a, c, all]) => {
+      .then(([p, a, c, all, allAbsences]) => {
         setPerson(p);
         setHistory(a.sort((x, y) => (x.startDate < y.startDate ? 1 : -1)));
         setCapacityPeriods(c);
         setAllPeople(all);
+        setAbsences(allAbsences.filter((ab) => ab.personId === id).sort((x, y) => (x.startDate < y.startDate ? -1 : 1)));
       })
       .finally(() => setLoading(false));
   }
@@ -79,6 +84,10 @@ export default function PersonDetailPage({ id }: { id: number }) {
   if (loading) return <div className="text-slate-400 dark:text-slate-500">Caricamento…</div>;
   if (!person) return <div className="text-slate-400 dark:text-slate-500">Persona non trovata</div>;
 
+  const todayStr = format(new Date(), "yyyy-MM-dd");
+  const currentAssignments = history.filter((a) => a.startDate <= todayStr && a.endDate >= todayStr);
+  const upcomingAbsences = absences.filter((a) => a.endDate >= todayStr && a.status !== "rifiutata").slice(0, 5);
+
   return (
     <div>
       <Link href="/people" className="mb-4 inline-block text-sm text-slate-500 dark:text-slate-400 hover:text-brand-600 dark:hover:text-brand-400">
@@ -97,13 +106,69 @@ export default function PersonDetailPage({ id }: { id: number }) {
             <h1 className="text-2xl font-bold text-slate-900 dark:text-slate-100">{person.name}</h1>
             <p className="text-sm text-slate-500 dark:text-slate-400">
               {person.role || "Ruolo non specificato"} · {person.capacityHoursPerWeek}h/settimana
-              {person.managerName && <> · Responsabile: {person.managerName}</>}
+              {person.managerName && person.managerId && (
+                <>
+                  {" "}
+                  · Responsabile:{" "}
+                  <Link href={`/people/${person.managerId}`} className="hover:text-brand-600 dark:hover:text-brand-400 hover:underline">
+                    {person.managerName}
+                  </Link>
+                </>
+              )}
             </p>
           </div>
         </div>
         <Button variant="secondary" onClick={() => setModalOpen(true)}>
           Modifica
         </Button>
+      </div>
+
+      <div className="mb-4 grid grid-cols-1 gap-4 sm:grid-cols-2">
+        <Card>
+          <CardHeader>
+            <h2 className="font-semibold text-slate-800 dark:text-slate-100">Progetti attuali</h2>
+          </CardHeader>
+          <CardBody className="space-y-2">
+            {currentAssignments.length === 0 ? (
+              <p className="py-2 text-center text-sm text-slate-400 dark:text-slate-500">Nessun progetto attivo oggi</p>
+            ) : (
+              currentAssignments.map((a) => (
+                <div key={a.id} className="flex items-center justify-between rounded-lg bg-slate-50 dark:bg-slate-700/40 px-3 py-2">
+                  <Link href={`/projects/${a.projectId}`}>
+                    <Badge color={a.projectColor}>{a.projectName}</Badge>
+                  </Link>
+                  <span className="text-sm font-semibold text-slate-700 dark:text-slate-200">{a.percentage}%</span>
+                </div>
+              ))
+            )}
+          </CardBody>
+        </Card>
+
+        <Card>
+          <CardHeader className="flex items-center justify-between">
+            <h2 className="font-semibold text-slate-800 dark:text-slate-100">Assenze</h2>
+            <Link href="/absences" className="text-xs font-medium text-brand-600 dark:text-brand-400 hover:underline">
+              Vedi tutte →
+            </Link>
+          </CardHeader>
+          <CardBody className="space-y-2">
+            {upcomingAbsences.length === 0 ? (
+              <p className="py-2 text-center text-sm text-slate-400 dark:text-slate-500">Nessuna assenza in corso o futura</p>
+            ) : (
+              upcomingAbsences.map((a) => (
+                <div key={a.id} className="flex items-center justify-between rounded-lg bg-slate-50 dark:bg-slate-700/40 px-3 py-2">
+                  <div>
+                    <Badge color={ABSENCE_COLOR[a.type]}>{ABSENCE_LABEL[a.type]}</Badge>
+                    <span className="ml-2 text-xs text-slate-500 dark:text-slate-400">
+                      {a.startDate} → {a.endDate}
+                    </span>
+                  </div>
+                  <Badge color={ABSENCE_STATUS_COLOR[a.status]}>{ABSENCE_STATUS_LABEL[a.status]}</Badge>
+                </div>
+              ))
+            )}
+          </CardBody>
+        </Card>
       </div>
 
       <Card>

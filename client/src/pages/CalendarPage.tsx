@@ -653,7 +653,14 @@ export default function CalendarPage() {
                               }
                               title={match ? `${ABSENCE_LABEL[match.type]} · ${ABSENCE_STATUS_LABEL[match.status]}` : undefined}
                             >
-                              {match ? ABSENCE_SHORT[match.type] : "—"}
+                              {match ? (
+                                <>
+                                  {match.status === "in_attesa" && <span className="mr-0.5">⏳</span>}
+                                  {ABSENCE_SHORT[match.type]}
+                                </>
+                              ) : (
+                                "—"
+                              )}
                             </button>
                           </td>
                         );
@@ -688,6 +695,9 @@ export default function CalendarPage() {
             <span className="h-3 w-3 rounded border border-violet-300 bg-violet-50 dark:border-violet-500 dark:bg-violet-500/10" />
             Festività
           </span>
+        )}
+        {dataMode === "absences" && (
+          <span className="flex items-center gap-1.5">⏳ In attesa di approvazione</span>
         )}
       </div>
 

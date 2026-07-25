@@ -1,7 +1,8 @@
 import { useEffect, useRef, useState } from "react";
 import { Link } from "wouter";
+import { format } from "date-fns";
 import { api } from "../lib/api";
-import type { DeliveryType, Person, Project, ProjectStatus } from "@shared/types";
+import type { Assignment, DeliveryType, Person, Project, ProjectStatus } from "@shared/types";
 import { Card, CardBody } from "../components/Card";
 import Button from "../components/Button";
 import { Badge, Input, Select, SortableTh } from "../components/ui";
@@ -15,6 +16,7 @@ type SortKey = "commessaId" | "name" | "client" | "status" | "deliveryType" | "p
 export default function ProjectsPage() {
   const [projects, setProjects] = useState<Project[]>([]);
   const [people, setPeople] = useState<Person[]>([]);
+  const [assignments, setAssignments] = useState<Assignment[]>([]);
   const [loading, setLoading] = useState(true);
   const [modalOpen, setModalOpen] = useState(false);
   const [editing, setEditing] = useState<Project | null>(null);
@@ -66,12 +68,22 @@ export default function ProjectsPage() {
 
   function load() {
     setLoading(true);
-    Promise.all([api.get<Project[]>("/projects"), api.get<Person[]>("/people")])
-      .then(([pr, p]) => {
+    Promise.all([api.get<Project[]>("/projects"), api.get<Person[]>("/people"), api.get<Assignment[]>("/assignments")])
+      .then(([pr, p, a]) => {
         setProjects(pr);
         setPeople(p);
+        setAssignments(a);
       })
       .finally(() => setLoading(false));
+  }
+
+  const todayStr = format(new Date(), "yyyy-MM-dd");
+  const assignedTodayByProject = new Map<number, Set<number>>();
+  for (const a of assignments) {
+    if (a.startDate > todayStr || a.endDate < todayStr) continue;
+    const set = assignedTodayByProject.get(a.projectId) ?? new Set<number>();
+    set.add(a.personId);
+    assignedTodayByProject.set(a.projectId, set);
   }
 
   useEffect(load, []);
@@ -181,6 +193,7 @@ export default function ProjectsPage() {
                   <SortableTh label="Delivery" sortKey="deliveryType" currentKey={sortKey} currentDir={sortDir} onSort={onSort} />
                   <SortableTh label="PM" sortKey="pmName" currentKey={sortKey} currentDir={sortDir} onSort={onSort} />
                   <SortableTh label="Periodo" sortKey="startDate" currentKey={sortKey} currentDir={sortDir} onSort={onSort} />
+                  <th className="px-5 py-3">Persone oggi</th>
                   <th className="px-5 py-3"></th>
                 </tr>
               </thead>
@@ -208,6 +221,7 @@ export default function ProjectsPage() {
                     <td className="px-5 py-3 text-slate-600 dark:text-slate-300">
                       {p.startDate ?? "—"} → {p.endDate ?? "—"}
                     </td>
+                    <td className="px-5 py-3 text-slate-600 dark:text-slate-300">{assignedTodayByProject.get(p.id)?.size ?? 0}</td>
                     <td className="px-5 py-3 text-right">
                       <button
                         className="mr-3 text-slate-500 dark:text-slate-400 hover:text-brand-600 dark:hover:text-brand-400"

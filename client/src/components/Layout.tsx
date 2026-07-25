@@ -110,10 +110,23 @@ export default function Layout({ children }: { children: ReactNode }) {
   const [location] = useLocation();
   const { user, logout } = useAuth();
   const { theme, toggleTheme } = useTheme();
+  const [mobileNavOpen, setMobileNavOpen] = useState(false);
+
+  useEffect(() => {
+    setMobileNavOpen(false);
+  }, [location]);
 
   return (
     <div className="flex h-screen overflow-hidden bg-slate-50 dark:bg-slate-900">
-      <aside className="flex w-60 shrink-0 flex-col border-r border-slate-200 bg-white dark:border-slate-700 dark:bg-slate-800">
+      {mobileNavOpen && (
+        <div className="fixed inset-0 z-30 bg-black/40 sm:hidden" onClick={() => setMobileNavOpen(false)} />
+      )}
+
+      <aside
+        className={`fixed inset-y-0 left-0 z-40 flex w-64 shrink-0 -translate-x-full flex-col border-r border-slate-200 bg-white transition-transform duration-200 dark:border-slate-700 dark:bg-slate-800 sm:static sm:z-auto sm:w-60 sm:translate-x-0 ${
+          mobileNavOpen ? "translate-x-0" : ""
+        }`}
+      >
         <div className="flex h-16 items-center gap-2 border-b border-slate-200 px-5 dark:border-slate-700">
           <div className="grid h-8 w-8 place-items-center rounded-lg bg-brand-500 text-sm font-bold text-white">
             WF
@@ -123,7 +136,7 @@ export default function Layout({ children }: { children: ReactNode }) {
 
         <GlobalSearch />
 
-        <nav className="flex-1 space-y-1 p-3">
+        <nav className="flex-1 space-y-1 overflow-y-auto p-3">
           {NAV.map((item) => {
             const active = item.href === "/" ? location === "/" : location.startsWith(item.href);
             return (
@@ -161,9 +174,23 @@ export default function Layout({ children }: { children: ReactNode }) {
         </div>
       </aside>
 
-      <main className="flex-1 overflow-y-auto">
-        <div className="mx-auto max-w-7xl px-6 py-6">{children}</div>
-      </main>
+      <div className="flex min-w-0 flex-1 flex-col overflow-hidden">
+        <div className="flex h-14 shrink-0 items-center gap-2 border-b border-slate-200 bg-white px-4 dark:border-slate-700 dark:bg-slate-800 sm:hidden">
+          <button
+            onClick={() => setMobileNavOpen(true)}
+            aria-label="Apri menu"
+            className="grid h-9 w-9 place-items-center rounded-lg text-slate-600 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-700"
+          >
+            ☰
+          </button>
+          <div className="grid h-7 w-7 place-items-center rounded-lg bg-brand-500 text-xs font-bold text-white">WF</div>
+          <span className="font-semibold text-slate-800 dark:text-slate-100">WorkForce</span>
+        </div>
+
+        <main className="flex-1 overflow-y-auto">
+          <div className="mx-auto max-w-7xl px-4 py-6 sm:px-6">{children}</div>
+        </main>
+      </div>
     </div>
   );
 }

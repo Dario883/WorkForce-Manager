@@ -5,7 +5,7 @@ import type { ActivityLogEntry, AppUser, Holiday, Settings } from "@shared/types
 import { Card, CardBody, CardHeader } from "../components/Card";
 import Button from "../components/Button";
 import Modal from "../components/Modal";
-import { Badge, Field, Input, SortableTh } from "../components/ui";
+import { Badge, Field, Input, Select, SortableTh } from "../components/ui";
 import { compareValues, useSortable } from "../lib/sort";
 
 export default function SettingsPage() {
@@ -14,6 +14,7 @@ export default function SettingsPage() {
   const [over, setOver] = useState(100);
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
+  const [activeTab, setActiveTab] = useState<"thresholds" | "holidays" | "users" | "activity">("thresholds");
 
   useEffect(() => {
     api.get<Settings>("/settings").then((s) => {
@@ -40,52 +41,79 @@ export default function SettingsPage() {
 
   if (!settings) return <div className="text-slate-400 dark:text-slate-500">Caricamento…</div>;
 
+  const TABS = [
+    { key: "thresholds", label: "Soglie" },
+    { key: "holidays", label: "Festività" },
+    { key: "users", label: "Utenti" },
+    { key: "activity", label: "Registro attività" },
+  ] as const;
+
   return (
     <div>
       <h1 className="mb-6 text-2xl font-bold text-slate-900 dark:text-slate-100">Impostazioni</h1>
 
-      <Card className="mb-6 max-w-lg">
-        <CardHeader>
-          <h2 className="font-semibold text-slate-800 dark:text-slate-100">Soglie di allocazione</h2>
-          <p className="text-xs text-slate-500 dark:text-slate-400">
-            Usate nella Dashboard per segnalare persone sotto o sovra allocate.
-          </p>
-        </CardHeader>
-        <CardBody>
-          <form onSubmit={handleSave}>
-            <Field label="Soglia sotto-utilizzo (%)">
-              <Input
-                type="number"
-                min={0}
-                max={100}
-                value={under}
-                onChange={(e) => setUnder(Number(e.target.value))}
-              />
-            </Field>
-            <Field label="Soglia sovra-utilizzo (%)">
-              <Input
-                type="number"
-                min={100}
-                max={300}
-                value={over}
-                onChange={(e) => setOver(Number(e.target.value))}
-              />
-            </Field>
+      <div className="flex flex-col gap-6 sm:flex-row">
+        <nav className="flex shrink-0 flex-row gap-1 sm:w-48 sm:flex-col">
+          {TABS.map((t) => (
+            <button
+              key={t.key}
+              onClick={() => setActiveTab(t.key)}
+              className={`rounded-lg px-3 py-2 text-left text-sm font-medium ${
+                activeTab === t.key
+                  ? "bg-brand-50 text-brand-700 dark:bg-brand-500/10 dark:text-brand-400"
+                  : "text-slate-600 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-700"
+              }`}
+            >
+              {t.label}
+            </button>
+          ))}
+        </nav>
 
-            {saved && <p className="mb-3 text-sm text-emerald-600 dark:text-emerald-400">Impostazioni salvate.</p>}
+        <div className="min-w-0 flex-1">
+          {activeTab === "thresholds" && (
+            <Card className="max-w-lg">
+              <CardHeader>
+                <h2 className="font-semibold text-slate-800 dark:text-slate-100">Soglie di allocazione</h2>
+                <p className="text-xs text-slate-500 dark:text-slate-400">
+                  Usate nella Dashboard per segnalare persone sotto o sovra allocate.
+                </p>
+              </CardHeader>
+              <CardBody>
+                <form onSubmit={handleSave}>
+                  <Field label="Soglia sotto-utilizzo (%)">
+                    <Input
+                      type="number"
+                      min={0}
+                      max={100}
+                      value={under}
+                      onChange={(e) => setUnder(Number(e.target.value))}
+                    />
+                  </Field>
+                  <Field label="Soglia sovra-utilizzo (%)">
+                    <Input
+                      type="number"
+                      min={100}
+                      max={300}
+                      value={over}
+                      onChange={(e) => setOver(Number(e.target.value))}
+                    />
+                  </Field>
 
-            <Button type="submit" disabled={saving}>
-              {saving ? "Salvataggio…" : "Salva impostazioni"}
-            </Button>
-          </form>
-        </CardBody>
-      </Card>
+                  {saved && <p className="mb-3 text-sm text-emerald-600 dark:text-emerald-400">Impostazioni salvate.</p>}
 
-      <HolidaysSection />
+                  <Button type="submit" disabled={saving}>
+                    {saving ? "Salvataggio…" : "Salva impostazioni"}
+                  </Button>
+                </form>
+              </CardBody>
+            </Card>
+          )}
 
-      <UsersSection />
-
-      <ActivityLogSection />
+          {activeTab === "holidays" && <HolidaysSection />}
+          {activeTab === "users" && <UsersSection />}
+          {activeTab === "activity" && <ActivityLogSection />}
+        </div>
+      </div>
     </div>
   );
 }
@@ -103,10 +131,16 @@ const ACTION_COLOR: Record<string, string> = {
 };
 
 type ActivitySortKey = "createdAt" | "userName" | "action" | "entityType" | "entityName";
+const PAGE_SIZE = 25;
 
 function ActivityLogSection() {
   const [entries, setEntries] = useState<ActivityLogEntry[]>([]);
   const [loading, setLoading] = useState(true);
+  const [userFilter, setUserFilter] = useState("");
+  const [entityTypeFilter, setEntityTypeFilter] = useState("");
+  const [fromDate, setFromDate] = useState("");
+  const [toDate, setToDate] = useState("");
+  const [visibleCount, setVisibleCount] = useState(PAGE_SIZE);
   const { sortKey, sortDir, onSort } = useSortable<ActivitySortKey>("createdAt", "desc");
 
   useEffect(() => {
@@ -116,7 +150,19 @@ function ActivityLogSection() {
       .finally(() => setLoading(false));
   }, []);
 
-  const sorted = [...entries].sort((a, b) => {
+  const userOptions = [...new Set(entries.map((e) => e.userName))].sort();
+  const entityTypeOptions = [...new Set(entries.map((e) => e.entityType))].sort();
+
+  const filtered = entries.filter((e) => {
+    if (userFilter && e.userName !== userFilter) return false;
+    if (entityTypeFilter && e.entityType !== entityTypeFilter) return false;
+    const day = e.createdAt.slice(0, 10);
+    if (fromDate && day < fromDate) return false;
+    if (toDate && day > toDate) return false;
+    return true;
+  });
+
+  const sorted = [...filtered].sort((a, b) => {
     const value = (e: ActivityLogEntry): string => {
       switch (sortKey) {
         case "userName":
@@ -134,16 +180,68 @@ function ActivityLogSection() {
     return compareValues(value(a), value(b), sortDir);
   });
 
+  const visible = sorted.slice(0, visibleCount);
+
   return (
-    <Card className="mt-6 max-w-4xl">
+    <Card className="max-w-4xl">
       <CardHeader>
         <h2 className="font-semibold text-slate-800 dark:text-slate-100">Registro attività</h2>
-        <p className="text-xs text-slate-500 dark:text-slate-400">Chi ha creato, modificato o eliminato cosa (ultime {entries.length} voci)</p>
+        <p className="text-xs text-slate-500 dark:text-slate-400">
+          Chi ha creato, modificato o eliminato cosa ({filtered.length} di {entries.length} voci)
+        </p>
       </CardHeader>
+      <CardBody className="grid grid-cols-1 gap-3 border-b border-slate-100 dark:border-slate-700 sm:grid-cols-4">
+        <Select
+          value={userFilter}
+          onChange={(e) => {
+            setUserFilter(e.target.value);
+            setVisibleCount(PAGE_SIZE);
+          }}
+        >
+          <option value="">Tutti gli utenti</option>
+          {userOptions.map((u) => (
+            <option key={u} value={u}>
+              {u}
+            </option>
+          ))}
+        </Select>
+        <Select
+          value={entityTypeFilter}
+          onChange={(e) => {
+            setEntityTypeFilter(e.target.value);
+            setVisibleCount(PAGE_SIZE);
+          }}
+        >
+          <option value="">Tutti i tipi</option>
+          {entityTypeOptions.map((t) => (
+            <option key={t} value={t} className="capitalize">
+              {t}
+            </option>
+          ))}
+        </Select>
+        <Input
+          type="date"
+          value={fromDate}
+          onChange={(e) => {
+            setFromDate(e.target.value);
+            setVisibleCount(PAGE_SIZE);
+          }}
+          title="Da data"
+        />
+        <Input
+          type="date"
+          value={toDate}
+          onChange={(e) => {
+            setToDate(e.target.value);
+            setVisibleCount(PAGE_SIZE);
+          }}
+          title="A data"
+        />
+      </CardBody>
       <CardBody className="p-0">
         {loading ? (
           <p className="p-6 text-center text-sm text-slate-400 dark:text-slate-500">Caricamento…</p>
-        ) : entries.length === 0 ? (
+        ) : filtered.length === 0 ? (
           <p className="p-6 text-center text-sm text-slate-400 dark:text-slate-500">Nessuna attività registrata</p>
         ) : (
           <div className="max-h-[28rem] overflow-y-auto">
@@ -158,7 +256,7 @@ function ActivityLogSection() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100 dark:divide-slate-700">
-                {sorted.map((e) => (
+                {visible.map((e) => (
                   <tr key={e.id} className="hover:bg-slate-50 dark:hover:bg-slate-700">
                     <td className="whitespace-nowrap px-5 py-3 text-xs text-slate-500 dark:text-slate-400">
                       {e.createdAt.replace("T", " ").slice(0, 16)}
@@ -176,6 +274,16 @@ function ActivityLogSection() {
           </div>
         )}
       </CardBody>
+      {filtered.length > visible.length && (
+        <div className="border-t border-slate-100 px-5 py-3 text-center dark:border-slate-700">
+          <button
+            className="text-sm font-medium text-brand-600 dark:text-brand-400 hover:underline"
+            onClick={() => setVisibleCount((v) => v + PAGE_SIZE)}
+          >
+            Mostra altre ({filtered.length - visible.length} rimanenti)
+          </button>
+        </div>
+      )}
     </Card>
   );
 }
@@ -219,7 +327,7 @@ function HolidaysSection() {
   }
 
   return (
-    <Card className="mb-6 max-w-2xl">
+    <Card className="max-w-2xl">
       <CardHeader>
         <h2 className="font-semibold text-slate-800 dark:text-slate-100">Festività aziendali</h2>
         <p className="text-xs text-slate-500 dark:text-slate-400">

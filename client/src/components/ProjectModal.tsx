@@ -8,7 +8,12 @@ import { Field, Input, Select } from "./ui";
 // Stable reference, same reasoning as AssignmentModal's NO_PEOPLE.
 const NO_PEOPLE: Person[] = [];
 
-const COLORS = ["#3457d5", "#059669", "#d97706", "#dc2626", "#7c3aed", "#0891b2"];
+// Validated categorical palette (dataviz skill): passes lightness, chroma,
+// CVD-separation, normal-vision-floor and contrast checks on both the app's
+// light (#ffffff) and dark (#1e293b) card surfaces — unlike the previous
+// hand-picked swatches, which failed the normal-vision floor between two
+// adjacent colors (red/orange, ΔE 14.4 < 15).
+const COLORS = ["#3987e5", "#d95926", "#199e70", "#c98500", "#d55181", "#008300"];
 
 export const STATUS_LABEL: Record<ProjectStatus, string> = {
   planned: "Pianificato",

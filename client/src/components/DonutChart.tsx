@@ -62,23 +62,27 @@ export default function DonutChart({
         </ResponsiveContainer>
       </div>
       <div className="min-w-0 flex-1 space-y-1 text-xs">
-        {data.map((d) => (
-          <button
-            key={d.name}
-            type="button"
-            onClick={() => onSliceClick?.(d.name)}
-            disabled={!onSliceClick}
-            className="flex w-full items-center justify-between gap-2 rounded px-1.5 py-1 text-left hover:bg-slate-50 dark:hover:bg-slate-700 disabled:cursor-default disabled:hover:bg-transparent"
-          >
-            <span className="flex min-w-0 items-center gap-1.5 text-slate-600 dark:text-slate-300">
-              <span className="h-2.5 w-2.5 shrink-0 rounded-full" style={{ backgroundColor: d.color }} />
-              <span className="truncate">{d.name}</span>
-            </span>
-            <span className="shrink-0 font-semibold text-slate-700 dark:text-slate-200">
-              {valueFormat ? valueFormat(d.value) : d.value}
-            </span>
-          </button>
-        ))}
+        {data.map((d) => {
+          const pct = total > 0 ? Math.round((d.value / total) * 100) : 0;
+          return (
+            <button
+              key={d.name}
+              type="button"
+              onClick={() => onSliceClick?.(d.name)}
+              disabled={!onSliceClick}
+              className="flex w-full items-center justify-between gap-2 rounded px-1.5 py-1 text-left hover:bg-slate-50 dark:hover:bg-slate-700 disabled:cursor-default disabled:hover:bg-transparent"
+            >
+              <span className="flex min-w-0 items-center gap-1.5 text-slate-600 dark:text-slate-300">
+                <span className="h-2.5 w-2.5 shrink-0 rounded-full" style={{ backgroundColor: d.color }} />
+                <span className="truncate">{d.name}</span>
+              </span>
+              <span className="shrink-0 font-semibold text-slate-700 dark:text-slate-200">
+                {valueFormat ? valueFormat(d.value) : d.value}
+                <span className="ml-1 font-normal text-slate-400 dark:text-slate-500">({pct}%)</span>
+              </span>
+            </button>
+          );
+        })}
       </div>
     </div>
   );

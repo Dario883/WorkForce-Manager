@@ -5,7 +5,8 @@ import Button from "./Button";
 import Modal from "./Modal";
 import { Field, Input, Select } from "./ui";
 
-const COLORS = ["#3457d5", "#059669", "#d97706", "#dc2626", "#7c3aed", "#0891b2"];
+// Same validated categorical palette used for project colors (see ProjectModal).
+const COLORS = ["#3987e5", "#d95926", "#199e70", "#c98500", "#d55181", "#008300"];
 
 // Stable reference: see AssignmentModal's NO_PEOPLE for why a fresh `[]`
 // default would be unsafe as a useEffect dependency.

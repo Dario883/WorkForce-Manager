@@ -35,6 +35,8 @@ export default function AbsencesPage() {
   const [yearFilter, setYearFilter] = useState<number>(currentYear);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const { sortKey, sortDir, onSort } = useSortable<SortKey>("startDate");
+  const [selected, setSelected] = useState<Set<number>>(new Set());
+  const [bulkSaving, setBulkSaving] = useState(false);
 
   function load() {
     setLoading(true);
@@ -112,6 +114,30 @@ export default function AbsencesPage() {
   async function handleStatusChange(id: number, status: AbsenceStatus) {
     await api.put(`/absences/${id}/status`, { status });
     load();
+  }
+
+  function toggleSelected(id: number) {
+    setSelected((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }
+
+  function toggleSelectAll() {
+    setSelected((prev) => (prev.size === sorted.length ? new Set() : new Set(sorted.map((a) => a.id))));
+  }
+
+  async function handleBulkStatusChange(status: AbsenceStatus) {
+    setBulkSaving(true);
+    try {
+      await Promise.all([...selected].map((id) => api.put(`/absences/${id}/status`, { status })));
+      setSelected(new Set());
+      load();
+    } finally {
+      setBulkSaving(false);
+    }
   }
 
   async function handleImport(e: React.ChangeEvent<HTMLInputElement>) {
@@ -223,6 +249,28 @@ export default function AbsencesPage() {
         </Select>
       </div>
 
+      {selected.size > 0 && (
+        <div className="mb-3 flex items-center justify-between rounded-lg bg-brand-50 dark:bg-brand-500/10 px-4 py-2.5 text-sm">
+          <span className="text-brand-700 dark:text-brand-400">{selected.size} selezionate</span>
+          <div className="flex gap-2">
+            <button
+              className="font-medium text-emerald-600 dark:text-emerald-400 hover:underline disabled:opacity-50"
+              disabled={bulkSaving}
+              onClick={() => handleBulkStatusChange("approvata")}
+            >
+              Approva selezionate
+            </button>
+            <button
+              className="font-medium text-red-600 dark:text-red-400 hover:underline disabled:opacity-50"
+              disabled={bulkSaving}
+              onClick={() => handleBulkStatusChange("rifiutata")}
+            >
+              Rifiuta selezionate
+            </button>
+          </div>
+        </div>
+      )}
+
       <Card>
         <CardBody className="p-0">
           {loading ? (
@@ -235,6 +283,14 @@ export default function AbsencesPage() {
             <table className="w-full text-sm">
               <thead className="border-b border-slate-100 dark:border-slate-700 text-left text-xs uppercase text-slate-500 dark:text-slate-400">
                 <tr>
+                  <th className="w-10 px-5 py-3">
+                    <input
+                      type="checkbox"
+                      checked={selected.size > 0 && selected.size === sorted.length}
+                      onChange={toggleSelectAll}
+                      className="h-4 w-4 rounded border-slate-300 text-brand-600 focus:ring-brand-500 dark:border-slate-600"
+                    />
+                  </th>
                   <SortableTh label="Persona" sortKey="personName" currentKey={sortKey} currentDir={sortDir} onSort={onSort} />
                   <SortableTh label="Tipo" sortKey="type" currentKey={sortKey} currentDir={sortDir} onSort={onSort} />
                   <SortableTh label="Stato" sortKey="status" currentKey={sortKey} currentDir={sortDir} onSort={onSort} />
@@ -247,6 +303,14 @@ export default function AbsencesPage() {
               <tbody className="divide-y divide-slate-100 dark:divide-slate-700">
                 {sorted.map((a) => (
                   <tr key={a.id} className="hover:bg-slate-50 dark:hover:bg-slate-700">
+                    <td className="px-5 py-3">
+                      <input
+                        type="checkbox"
+                        checked={selected.has(a.id)}
+                        onChange={() => toggleSelected(a.id)}
+                        className="h-4 w-4 rounded border-slate-300 text-brand-600 focus:ring-brand-500 dark:border-slate-600"
+                      />
+                    </td>
                     <td className="px-5 py-3 font-medium text-slate-800 dark:text-slate-100">
                       <Link href={`/people/${a.personId}`} className="hover:text-brand-600 dark:hover:text-brand-400 hover:underline">
                         {a.personName}

@@ -6,7 +6,7 @@ import { asyncHandler } from "../asyncHandler";
 
 export const activityRouter = Router();
 
-const MAX_ENTRIES = 200;
+const MAX_ENTRIES = 500;
 
 activityRouter.get("/", asyncHandler(async (_req, res) => {
   const rows = await db.select().from(activityLog).orderBy(desc(activityLog.createdAt)).limit(MAX_ENTRIES);

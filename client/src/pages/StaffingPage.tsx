@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { Fragment, useEffect, useRef, useState } from "react";
 import { Link } from "wouter";
 import { api } from "../lib/api";
 import type { Assignment, Person, Project } from "@shared/types";
@@ -9,6 +9,7 @@ import AssignmentModal from "../components/AssignmentModal";
 import { compareValues, useSortable } from "../lib/sort";
 
 type SortKey = "personName" | "projectName" | "percentage" | "startDate";
+type ViewMode = "list" | "person";
 
 export default function StaffingPage() {
   const [assignments, setAssignments] = useState<Assignment[]>([]);
@@ -21,6 +22,8 @@ export default function StaffingPage() {
   const [personFilter, setPersonFilter] = useState<number | "">("");
   const [projectFilter, setProjectFilter] = useState<number | "">("");
   const [activeOn, setActiveOn] = useState("");
+  const [viewMode, setViewMode] = useState<ViewMode>("list");
+  const [collapsed, setCollapsed] = useState<Record<number, boolean>>({});
   const fileInputRef = useRef<HTMLInputElement>(null);
   const { sortKey, sortDir, onSort } = useSortable<SortKey>("startDate");
 
@@ -48,6 +51,22 @@ export default function StaffingPage() {
     };
     return compareValues(value(a), value(b), sortDir);
   });
+
+  const groupedByPerson = (() => {
+    const map = new Map<number, { personName: string; rows: Assignment[] }>();
+    for (const a of sortedAssignments) {
+      const entry = map.get(a.personId) ?? { personName: a.personName ?? "—", rows: [] };
+      entry.rows.push(a);
+      map.set(a.personId, entry);
+    }
+    return [...map.entries()]
+      .map(([personId, v]) => ({ personId, ...v }))
+      .sort((a, b) => a.personName.localeCompare(b.personName));
+  })();
+
+  function togglePerson(personId: number) {
+    setCollapsed((prev) => ({ ...prev, [personId]: !prev[personId] }));
+  }
 
   function load() {
     setLoading(true);
@@ -145,6 +164,22 @@ export default function StaffingPage() {
         <Input type="date" value={activeOn} onChange={(e) => setActiveOn(e.target.value)} title="Attive in questa data" />
       </div>
 
+      <div className="mb-4 flex justify-end">
+        <div className="flex rounded-lg border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-800 p-0.5">
+          {(["list", "person"] as ViewMode[]).map((m) => (
+            <button
+              key={m}
+              onClick={() => setViewMode(m)}
+              className={`rounded-md px-3 py-1.5 text-sm font-medium ${
+                viewMode === m ? "bg-brand-500 text-white" : "text-slate-600 dark:text-slate-300"
+              }`}
+            >
+              {m === "list" ? "Lista" : "Per persona"}
+            </button>
+          ))}
+        </div>
+      </div>
+
       <Card>
         <CardBody className="p-0">
           {loading ? (
@@ -153,7 +188,7 @@ export default function StaffingPage() {
             <p className="p-6 text-center text-sm text-slate-400 dark:text-slate-500">Nessuna assegnazione presente</p>
           ) : filteredAssignments.length === 0 ? (
             <p className="p-6 text-center text-sm text-slate-400 dark:text-slate-500">Nessun risultato per i filtri selezionati</p>
-          ) : (
+          ) : viewMode === "list" ? (
             <table className="w-full text-sm">
               <thead className="border-b border-slate-100 dark:border-slate-700 text-left text-xs uppercase text-slate-500 dark:text-slate-400">
                 <tr>
@@ -197,6 +232,72 @@ export default function StaffingPage() {
                     </td>
                   </tr>
                 ))}
+              </tbody>
+            </table>
+          ) : (
+            <table className="w-full text-sm">
+              <thead className="border-b border-slate-100 dark:border-slate-700 text-left text-xs uppercase text-slate-500 dark:text-slate-400">
+                <tr>
+                  <th className="px-5 py-3">Progetto</th>
+                  <th className="px-5 py-3">%</th>
+                  <th className="px-5 py-3">Periodo</th>
+                  <th className="px-5 py-3"></th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100 dark:divide-slate-700">
+                {groupedByPerson.map((g) => {
+                  const isCollapsed = !!collapsed[g.personId];
+                  return (
+                    <Fragment key={g.personId}>
+                      <tr className="bg-slate-50 dark:bg-slate-700/40">
+                        <td colSpan={4} className="px-5 py-2">
+                          <button
+                            className="flex items-center gap-2 font-medium text-slate-800 dark:text-slate-100"
+                            onClick={() => togglePerson(g.personId)}
+                          >
+                            <span className="inline-flex h-5 w-5 items-center justify-center rounded border border-slate-300 dark:border-slate-600 text-xs">
+                              {isCollapsed ? "+" : "−"}
+                            </span>
+                            <Link href={`/people/${g.personId}`} onClick={(e) => e.stopPropagation()} className="hover:text-brand-600 dark:hover:text-brand-400 hover:underline">
+                              {g.personName}
+                            </Link>
+                            <span className="text-xs font-normal text-slate-500 dark:text-slate-400">
+                              {g.rows.length} assegnazion{g.rows.length === 1 ? "e" : "i"}
+                            </span>
+                          </button>
+                        </td>
+                      </tr>
+                      {!isCollapsed &&
+                        g.rows.map((a) => (
+                          <tr key={a.id} className="hover:bg-slate-50 dark:hover:bg-slate-700">
+                            <td className="px-5 py-3 pl-12">
+                              <Link href={`/projects/${a.projectId}`}>
+                                <Badge color={a.projectColor}>{a.projectName}</Badge>
+                              </Link>
+                            </td>
+                            <td className="px-5 py-3 text-slate-600 dark:text-slate-300">{a.percentage}%</td>
+                            <td className="px-5 py-3 text-slate-600 dark:text-slate-300">
+                              {a.startDate} → {a.endDate}
+                            </td>
+                            <td className="px-5 py-3 text-right">
+                              <button
+                                className="mr-3 text-slate-500 dark:text-slate-400 hover:text-brand-600 dark:hover:text-brand-400"
+                                onClick={() => {
+                                  setEditing(a);
+                                  setModalOpen(true);
+                                }}
+                              >
+                                Modifica
+                              </button>
+                              <button className="text-slate-500 dark:text-slate-400 hover:text-red-600 dark:hover:text-red-400" onClick={() => handleDelete(a.id)}>
+                                Rimuovi
+                              </button>
+                            </td>
+                          </tr>
+                        ))}
+                    </Fragment>
+                  );
+                })}
               </tbody>
             </table>
           )}

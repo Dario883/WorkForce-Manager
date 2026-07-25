@@ -27,6 +27,7 @@ export default function PeoplePage() {
   const [editing, setEditing] = useState<Person | null>(null);
   const [search, setSearch] = useState("");
   const [roleFilter, setRoleFilter] = useState("");
+  const [approverFilter, setApproverFilter] = useState<"all" | "yes" | "no">("all");
   const fileInputRef = useRef<HTMLInputElement>(null);
   const { sortKey, sortDir, onSort } = useSortable<SortKey>("name");
 
@@ -34,6 +35,8 @@ export default function PeoplePage() {
 
   const filteredPeople = people.filter((p) => {
     if (roleFilter && p.role !== roleFilter) return false;
+    if (approverFilter === "yes" && !p.isApprover) return false;
+    if (approverFilter === "no" && p.isApprover) return false;
     const q = search.trim().toLowerCase();
     if (!q) return true;
     return p.name.toLowerCase().includes(q) || (p.role ?? "").toLowerCase().includes(q);
@@ -154,6 +157,11 @@ export default function PeoplePage() {
             </option>
           ))}
         </Select>
+        <Select value={approverFilter} onChange={(e) => setApproverFilter(e.target.value as "all" | "yes" | "no")} className="sm:w-56">
+          <option value="all">Tutti</option>
+          <option value="yes">Solo responsabili</option>
+          <option value="no">Non responsabili</option>
+        </Select>
       </div>
 
       <Card>
@@ -200,6 +208,7 @@ export default function PeoplePage() {
                           {p.name.slice(0, 1).toUpperCase()}
                         </span>
                         {p.name}
+                        {p.isApprover && <Badge color="#7c3aed">Responsabile</Badge>}
                       </Link>
                     </td>
                     <td className="px-5 py-3 text-slate-600 dark:text-slate-300">{p.role || "—"}</td>
