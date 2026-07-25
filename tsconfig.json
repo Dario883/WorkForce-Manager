@@ -18,5 +18,5 @@
       "@shared/*": ["shared/*"]
     }
   },
-  "include": ["client/src", "server", "shared"]
+  "include": ["client/src", "server", "shared", "tests", "e2e", "vitest.config.ts", "playwright.config.ts"]
 }

@@ -81,18 +81,18 @@ const VALID_STATUSES = ["planned", "active", "on_hold", "completed"];
 const VALID_DELIVERY_TYPES = ["TK", "T&M", "TaaS", "AMS"];
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 
-function parseStatus(raw?: string): string {
+export function parseStatus(raw?: string): string {
   const normalized = raw?.trim().toLowerCase().replace(/[\s-]+/g, "_");
   return normalized && VALID_STATUSES.includes(normalized) ? normalized : "planned";
 }
 
-function parseDeliveryType(raw?: string): string {
+export function parseDeliveryType(raw?: string): string {
   const value = raw?.trim();
   const match = VALID_DELIVERY_TYPES.find((v) => v.toLowerCase() === value?.toLowerCase());
   return match ?? "T&M";
 }
 
-function parseDate(raw?: string): string | null {
+export function parseDate(raw?: string): string | null {
   const value = raw?.trim();
   if (!value) return null;
   if (DATE_RE.test(value)) return value;

@@ -53,7 +53,31 @@ npm run dev:client    # frontend su :5173 (proxy verso :3000)
 
 Apri `http://localhost:5173` e accedi con le credenziali seed.
 
-### 5. Build di produzione
+### 5. Test
+
+```bash
+npm test              # unit + integration (Vitest)
+npm run test:e2e      # end-to-end (Playwright)
+```
+
+I test unitari (`tests/unit/`) non toccano un database. I test di integrazione
+(`tests/integration/`) e i test e2e (`e2e/`) usano un database Postgres
+**dedicato e usa-e-getta** (vengono svuotati con `TRUNCATE` prima di ogni
+test) — non vanno mai puntati al `DATABASE_URL` che usi per lo sviluppo.
+Configura un database separato e aggiungi al tuo `.env`:
+
+```
+TEST_DATABASE_URL=postgresql://.../workforce_manager_test
+```
+
+Se `TEST_DATABASE_URL` non è impostata, i test di integrazione vengono
+saltati automaticamente (`npm test` esegue comunque quelli unitari); i test
+e2e invece falliscono subito con un errore esplicito, perché hanno bisogno
+di un database per poter effettuare il login. In CI (`.github/workflows/deploy.yml`)
+viene usato un container Postgres effimero, quindi non serve alcuna
+configurazione: il job `test` gira automaticamente prima del deploy.
+
+### 6. Build di produzione
 
 ```bash
 npm run build

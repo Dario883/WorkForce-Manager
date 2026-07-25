@@ -79,7 +79,7 @@ absencesRouter.get("/export", asyncHandler(async (_req, res) => {
 
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 
-function parseDate(raw?: string): string | null {
+export function parseDate(raw?: string): string | null {
   const value = raw?.trim();
   if (!value) return null;
   if (DATE_RE.test(value)) return value;
@@ -91,7 +91,7 @@ function parseDate(raw?: string): string | null {
   return null;
 }
 
-function parseType(raw?: string): string {
+export function parseType(raw?: string): string {
   const normalized = raw?.trim().toLowerCase();
   return normalized && (ABSENCE_TYPES as readonly string[]).includes(normalized) ? normalized : "ferie";
 }

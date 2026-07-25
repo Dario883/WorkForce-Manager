@@ -89,7 +89,7 @@ assignmentsRouter.get("/export", asyncHandler(async (_req, res) => {
 const ASSIGNMENT_DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 const VALID_PERIOD_TYPES = ["day", "week", "month", "year"];
 
-function parseAssignmentDate(raw?: string): string | null {
+export function parseAssignmentDate(raw?: string): string | null {
   const value = raw?.trim();
   if (!value) return null;
   if (ASSIGNMENT_DATE_RE.test(value)) return value;
@@ -282,7 +282,7 @@ const splitSchema = z.object({
   percentage: z.number(),
 });
 
-function unitRange(dateStr: string, unit: "day" | "week" | "month" | "year") {
+export function unitRange(dateStr: string, unit: "day" | "week" | "month" | "year") {
   const d = new Date(dateStr);
   switch (unit) {
     case "day":

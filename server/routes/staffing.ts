@@ -8,7 +8,7 @@ import { asyncHandler } from "../asyncHandler";
 
 /** Resolves a person's effective hours/week on a given day: the capacity
  * period covering that date, if any, otherwise the person's base value. */
-function resolveCapacity(
+export function resolveCapacity(
   periods: { startDate: string; endDate: string | null; hoursPerWeek: number }[],
   base: number,
   day: string
