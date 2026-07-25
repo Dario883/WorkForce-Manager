@@ -6,7 +6,7 @@ import { eq } from "drizzle-orm";
 import { asyncHandler } from "../asyncHandler";
 import { hashPassword } from "../auth";
 import { logActivity } from "../activityLog";
-import { APP_TABS } from "@shared/types";
+import { ALL_PERMISSION_KEYS } from "@shared/types";
 
 export const usersRouter = Router();
 
@@ -19,7 +19,7 @@ const USER_COLUMNS = {
   createdAt: users.createdAt,
 };
 
-const TAB_KEYS = APP_TABS.map((t) => t.key) as [string, ...string[]];
+const TAB_KEYS = ALL_PERMISSION_KEYS.map((t) => t.key) as [string, ...string[]];
 
 usersRouter.get("/", asyncHandler(async (_req, res) => {
   const rows = await db.select(USER_COLUMNS).from(users).orderBy(users.name);
@@ -64,8 +64,12 @@ usersRouter.put("/:id", asyncHandler(async (req, res) => {
   if (parsed.data.active === false && isSelf) {
     return res.status(400).json({ error: "Non puoi disattivare il tuo stesso account" });
   }
-  if (isSelf && parsed.data.permissions && !parsed.data.permissions.includes("settings")) {
-    return res.status(400).json({ error: "Non puoi rimuovere il tuo stesso accesso a Impostazioni" });
+  if (
+    isSelf &&
+    parsed.data.permissions &&
+    (!parsed.data.permissions.includes("settings") || !parsed.data.permissions.includes("settings:users"))
+  ) {
+    return res.status(400).json({ error: "Non puoi rimuovere il tuo stesso accesso a Impostazioni > Utenti" });
   }
 
   const { password, ...rest } = parsed.data;

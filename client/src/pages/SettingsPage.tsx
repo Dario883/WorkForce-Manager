@@ -2,20 +2,39 @@ import { useEffect, useState } from "react";
 import { api, ApiError } from "../lib/api";
 import { useAuth } from "../lib/auth";
 import type { ActivityLogEntry, AppUser, Holiday, Settings } from "@shared/types";
-import { APP_TABS } from "@shared/types";
+import { APP_TABS, SETTINGS_SUB_TABS, ALL_PERMISSION_KEYS } from "@shared/types";
 import { Card, CardBody, CardHeader } from "../components/Card";
 import Button from "../components/Button";
 import Modal from "../components/Modal";
 import { Badge, Field, Input, Select, SortableTh } from "../components/ui";
 import { compareValues, useSortable } from "../lib/sort";
 
+const SETTINGS_TABS = [
+  { key: "thresholds", label: "Soglie" },
+  { key: "holidays", label: "Festività" },
+  { key: "users", label: "Utenti" },
+  { key: "activity", label: "Registro attività" },
+] as const;
+
 export default function SettingsPage() {
+  const { can } = useAuth();
   const [settings, setSettings] = useState<Settings | null>(null);
   const [under, setUnder] = useState(70);
   const [over, setOver] = useState(100);
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
   const [activeTab, setActiveTab] = useState<"thresholds" | "holidays" | "users" | "activity">("thresholds");
+
+  const visibleTabs = SETTINGS_TABS.filter((t) => can(`settings:${t.key}`));
+  const visibleKeys = visibleTabs.map((t) => t.key).join(",");
+
+  useEffect(() => {
+    const keys = visibleKeys ? visibleKeys.split(",") : [];
+    if (keys.length && !keys.includes(activeTab)) {
+      setActiveTab(keys[0] as typeof activeTab);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [visibleKeys]);
 
   useEffect(() => {
     api.get<Settings>("/settings").then((s) => {
@@ -42,12 +61,16 @@ export default function SettingsPage() {
 
   if (!settings) return <div className="text-slate-400 dark:text-slate-500">Caricamento…</div>;
 
-  const TABS = [
-    { key: "thresholds", label: "Soglie" },
-    { key: "holidays", label: "Festività" },
-    { key: "users", label: "Utenti" },
-    { key: "activity", label: "Registro attività" },
-  ] as const;
+  if (visibleTabs.length === 0) {
+    return (
+      <div>
+        <h1 className="mb-6 text-2xl font-bold text-slate-900 dark:text-slate-100">Impostazioni</h1>
+        <p className="text-sm text-slate-400 dark:text-slate-500">
+          Non hai i permessi per accedere a nessuna sotto-sezione di Impostazioni.
+        </p>
+      </div>
+    );
+  }
 
   return (
     <div>
@@ -55,7 +78,7 @@ export default function SettingsPage() {
 
       <div className="flex flex-col gap-6 sm:flex-row">
         <nav className="flex shrink-0 flex-row gap-1 sm:w-48 sm:flex-col">
-          {TABS.map((t) => (
+          {visibleTabs.map((t) => (
             <button
               key={t.key}
               onClick={() => setActiveTab(t.key)}
@@ -460,7 +483,9 @@ function UsersSection() {
                     </td>
                     <td className="px-5 py-3">
                       <Badge color={u.permissions ? "#c98500" : "#3987e5"}>
-                        {u.permissions ? `${u.permissions.length}/${APP_TABS.length} sezioni` : "Tutte le sezioni"}
+                        {u.permissions
+                          ? `${u.permissions.length}/${ALL_PERMISSION_KEYS.length} sezioni`
+                          : "Tutte le sezioni"}
                       </Badge>
                     </td>
                     <td className="px-5 py-3 text-right">
@@ -545,8 +570,9 @@ function EditUserModal({
 
   if (!user) return null;
 
-  const allTabs = APP_TABS.map((t) => t.key);
+  const allTabs = ALL_PERMISSION_KEYS.map((t) => t.key);
   const hasFullAccess = permissions === null;
+  const isSettingsChecked = hasFullAccess || (permissions?.includes("settings") ?? false);
 
   function toggleTab(key: string) {
     setPermissions((prev) => {
@@ -616,8 +642,38 @@ function EditUserModal({
           </div>
           {isSelf && (
             <p className="mt-1 text-xs text-slate-400 dark:text-slate-500">
-              Non puoi rimuovere il tuo stesso accesso a Impostazioni.
+              Non puoi rimuovere il tuo stesso accesso a Impostazioni &gt; Utenti.
             </p>
+          )}
+
+          {isSettingsChecked && (
+            <div className="mt-3 border-l-2 border-slate-200 pl-3 dark:border-slate-600">
+              <p className="mb-2 text-xs font-semibold uppercase text-slate-400 dark:text-slate-500">
+                Sotto-sezioni di Impostazioni
+              </p>
+              <div className="grid grid-cols-2 gap-2">
+                {SETTINGS_SUB_TABS.map((t) => {
+                  const checked = hasFullAccess || (permissions?.includes(t.key) ?? false);
+                  const lockedForSelf = isSelf && t.key === "settings:users";
+                  return (
+                    <label
+                      key={t.key}
+                      className={`flex items-center gap-2 text-sm ${
+                        lockedForSelf ? "text-slate-400 dark:text-slate-500" : "text-slate-700 dark:text-slate-200"
+                      }`}
+                    >
+                      <input
+                        type="checkbox"
+                        checked={checked}
+                        disabled={hasFullAccess || lockedForSelf}
+                        onChange={() => toggleTab(t.key)}
+                      />
+                      {t.label}
+                    </label>
+                  );
+                })}
+              </div>
+            </div>
           )}
         </div>
 

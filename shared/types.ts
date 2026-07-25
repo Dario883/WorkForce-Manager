@@ -109,6 +109,20 @@ export const APP_TABS = [
 
 export type AppTabKey = (typeof APP_TABS)[number]["key"];
 
+// Sub-sections of the "settings" tab, grantable independently so an admin can
+// decide who sees Soglie/Festività/Utenti/Registro attività without giving
+// blanket Impostazioni access. Meaningful only alongside the "settings" key.
+export const SETTINGS_SUB_TABS = [
+  { key: "settings:thresholds", label: "Soglie" },
+  { key: "settings:holidays", label: "Festività" },
+  { key: "settings:users", label: "Utenti" },
+  { key: "settings:activity", label: "Registro attività" },
+] as const;
+
+export type SettingsSubTabKey = (typeof SETTINGS_SUB_TABS)[number]["key"];
+
+export const ALL_PERMISSION_KEYS = [...APP_TABS, ...SETTINGS_SUB_TABS] as const;
+
 export interface AuthUser {
   userId: number;
   email: string;

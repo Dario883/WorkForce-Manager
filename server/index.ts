@@ -33,16 +33,30 @@ app.use("/api/auth", authRouter);
 
 // Protected — reads stay open across tabs (shared dashboards/aggregations
 // depend on them), writes are gated per-tab; /users and /activity are only
-// ever consumed by the Impostazioni tab, so they're fully gated.
+// ever consumed by the Impostazioni tab, so they're fully gated. Within
+// Impostazioni, each sub-section (Soglie/Festività/Utenti/Registro) has its
+// own grant on top of the "settings" tab grant.
 app.use("/api/people", requireAuth, requireTabWrite("people"), peopleRouter);
 app.use("/api/projects", requireAuth, requireTabWrite("projects"), projectsRouter);
 app.use("/api/assignments", requireAuth, requireTabWrite("staffing"), assignmentsRouter);
 app.use("/api/staffing", requireAuth, staffingRouter);
-app.use("/api/settings", requireAuth, requireTabWrite("settings"), settingsRouter);
-app.use("/api/users", requireAuth, requireTab("settings"), usersRouter);
+app.use(
+  "/api/settings",
+  requireAuth,
+  requireTabWrite("settings"),
+  requireTabWrite("settings:thresholds"),
+  settingsRouter
+);
+app.use("/api/users", requireAuth, requireTab("settings"), requireTab("settings:users"), usersRouter);
 app.use("/api/absences", requireAuth, requireTabWrite("absences"), absencesRouter);
-app.use("/api/holidays", requireAuth, requireTabWrite("settings"), holidaysRouter);
-app.use("/api/activity", requireAuth, requireTab("settings"), activityRouter);
+app.use(
+  "/api/holidays",
+  requireAuth,
+  requireTabWrite("settings"),
+  requireTabWrite("settings:holidays"),
+  holidaysRouter
+);
+app.use("/api/activity", requireAuth, requireTab("settings"), requireTab("settings:activity"), activityRouter);
 
 if (process.env.NODE_ENV === "production") {
   const publicDir = path.join(__dirname, "public");
