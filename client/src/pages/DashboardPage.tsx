@@ -392,75 +392,85 @@ export default function DashboardPage() {
         <p className="text-slate-400 dark:text-slate-500">Caricamento…</p>
       ) : (
         <>
-      <div className="mb-6 space-y-5">
+      <div className="mb-6 space-y-4">
         <div>
           <h3 className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-400 dark:text-slate-500">Team</h3>
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
-            <KpiCard label="Persone" value={people.length} icon="👥" href="/people" />
-            <KpiCard
-              label="Persone fuori soglia"
-              value={outOfThresholdCount}
-              icon="⚖️"
-              tone={outOfThresholdCount > 0 ? "warn" : "ok"}
-              onClick={openOutOfThresholdDrilldown}
-              trendDelta={outOfThresholdDelta}
-            />
-            <KpiCard
-              label="Allocazione media team"
-              value={`${Math.round(teamAvg)}%`}
-              icon="📊"
-              trendDelta={teamAvgDelta}
-            />
-            <KpiCard label="Capacità libera / FTE" value={`${freeHoursTotal}h · ${fteAllocated.toFixed(1)}/${fteTotal.toFixed(1)} FTE`} icon="🧮" />
-          </div>
+          <StatStrip
+            items={[
+              { label: "Persone", value: people.length, icon: "👥", href: "/people" },
+              {
+                label: "Persone fuori soglia",
+                value: outOfThresholdCount,
+                icon: "⚖️",
+                tone: outOfThresholdCount > 0 ? "warn" : "ok",
+                onClick: openOutOfThresholdDrilldown,
+                trendDelta: outOfThresholdDelta,
+              },
+              {
+                label: "Allocazione media team",
+                value: `${Math.round(teamAvg)}%`,
+                icon: "📊",
+                trendDelta: teamAvgDelta,
+              },
+              {
+                label: "Capacità libera / FTE",
+                value: `${freeHoursTotal}h · ${fteAllocated.toFixed(1)}/${fteTotal.toFixed(1)} FTE`,
+                icon: "🧮",
+              },
+            ]}
+          />
         </div>
 
         <div>
           <h3 className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-400 dark:text-slate-500">Progetti</h3>
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
-            <KpiCard label="Progetti attivi" value={activeProjects.length} icon="📁" href="/projects" />
-            <KpiCard
-              label={`In scadenza (${UPCOMING_DEADLINE_DAYS}gg)`}
-              value={projectsNearingDeadline.length}
-              icon="⏳"
-              tone={projectsNearingDeadline.length > 0 ? "warn" : "ok"}
-              onClick={openDeadlineDrilldown}
-            />
-            <KpiCard
-              label={`In partenza (${UPCOMING_START_DAYS}gg)`}
-              value={projectsStartingSoon.length}
-              icon="🚀"
-              tone={projectsStartingSoon.length > 0 ? "warn" : "ok"}
-              onClick={openStartingSoonDrilldown}
-            />
-            <KpiCard
-              label="Senza risorse"
-              value={projectsWithoutResources.length}
-              icon="🚧"
-              tone={projectsWithoutResources.length > 0 ? "danger" : "ok"}
-              onClick={openWithoutResourcesDrilldown}
-            />
-          </div>
+          <StatStrip
+            items={[
+              { label: "Progetti attivi", value: activeProjects.length, icon: "📁", href: "/projects" },
+              {
+                label: `In scadenza (${UPCOMING_DEADLINE_DAYS}gg)`,
+                value: projectsNearingDeadline.length,
+                icon: "⏳",
+                tone: projectsNearingDeadline.length > 0 ? "warn" : "ok",
+                onClick: openDeadlineDrilldown,
+              },
+              {
+                label: `In partenza (${UPCOMING_START_DAYS}gg)`,
+                value: projectsStartingSoon.length,
+                icon: "🚀",
+                tone: projectsStartingSoon.length > 0 ? "warn" : "ok",
+                onClick: openStartingSoonDrilldown,
+              },
+              {
+                label: "Senza risorse",
+                value: projectsWithoutResources.length,
+                icon: "🚧",
+                tone: projectsWithoutResources.length > 0 ? "danger" : "ok",
+                onClick: openWithoutResourcesDrilldown,
+              },
+            ]}
+          />
         </div>
 
         <div>
           <h3 className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-400 dark:text-slate-500">Ferie</h3>
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
-            <KpiCard
-              label="Giorni di assenza nel periodo"
-              value={totalAbsenceDays}
-              icon="🌴"
-              onClick={openAbsencesDrilldown}
-              trendDelta={absenceDaysDelta}
-            />
-            <KpiCard
-              label="Richieste in attesa"
-              value={pendingApprovals.length}
-              icon="📝"
-              tone={pendingApprovals.length > 0 ? "warn" : "ok"}
-              onClick={openPendingApprovalsDrilldown}
-            />
-          </div>
+          <StatStrip
+            items={[
+              {
+                label: "Giorni di assenza nel periodo",
+                value: totalAbsenceDays,
+                icon: "🌴",
+                onClick: openAbsencesDrilldown,
+                trendDelta: absenceDaysDelta,
+              },
+              {
+                label: "Richieste in attesa",
+                value: pendingApprovals.length,
+                icon: "📝",
+                tone: pendingApprovals.length > 0 ? "warn" : "ok",
+                onClick: openPendingApprovalsDrilldown,
+              },
+            ]}
+          />
         </div>
       </div>
 
@@ -474,9 +484,9 @@ export default function DashboardPage() {
             Modifica soglie →
           </Link>
         </CardHeader>
-        <CardBody className="space-y-3">
+        <CardBody className="grid grid-cols-1 gap-x-6 gap-y-3 lg:grid-cols-2">
           {avgPerPerson.length === 0 && (
-            <p className="py-4 text-center text-sm text-slate-400 dark:text-slate-500">Nessun dato per il periodo selezionato</p>
+            <p className="py-4 text-center text-sm text-slate-400 dark:text-slate-500 lg:col-span-2">Nessun dato per il periodo selezionato</p>
           )}
           {[...avgPerPerson]
             .sort((a, b) => b.avg - a.avg)
@@ -614,15 +624,7 @@ export default function DashboardPage() {
   );
 }
 
-function KpiCard({
-  label,
-  value,
-  icon,
-  tone = "neutral",
-  href,
-  onClick,
-  trendDelta,
-}: {
+interface StatItemData {
   label: string;
   value: number | string;
   icon: string;
@@ -630,47 +632,63 @@ function KpiCard({
   href?: string;
   onClick?: () => void;
   trendDelta?: number;
-}) {
-  const toneColor: Record<string, string> = {
-    ok: "text-emerald-600 dark:text-emerald-400",
-    warn: "text-amber-600 dark:text-amber-400",
-    danger: "text-red-600 dark:text-red-400",
-    neutral: "text-slate-900 dark:text-slate-100",
-  };
-  const roundedDelta = trendDelta !== undefined ? Math.round(trendDelta) : 0;
-  const body = (
-    <CardBody className="flex items-center gap-4">
-      <div className="grid h-11 w-11 shrink-0 place-items-center rounded-lg bg-brand-50 dark:bg-brand-500/10 text-xl">{icon}</div>
-      <div>
-        <div className={`text-2xl font-bold ${toneColor[tone]}`}>{value}</div>
-        <div className="text-xs text-slate-500 dark:text-slate-400">{label}</div>
-        {trendDelta !== undefined && (
-          <div
-            className={`mt-0.5 text-xs font-medium ${
-              roundedDelta === 0 ? "text-slate-400 dark:text-slate-500" : roundedDelta > 0 ? "text-slate-600 dark:text-slate-300" : "text-slate-600 dark:text-slate-300"
-            }`}
-            title="Rispetto al periodo precedente"
-          >
-            {roundedDelta === 0 ? "–" : roundedDelta > 0 ? "▲" : "▼"} {Math.abs(roundedDelta)}pt vs periodo prec.
-          </div>
-        )}
+}
+
+const STAT_TONE_COLOR: Record<string, string> = {
+  ok: "text-emerald-600 dark:text-emerald-400",
+  warn: "text-amber-600 dark:text-amber-400",
+  danger: "text-red-600 dark:text-red-400",
+  neutral: "text-slate-900 dark:text-slate-100",
+};
+
+function StatStrip({ items }: { items: StatItemData[] }) {
+  return (
+    <Card>
+      <div className="flex flex-wrap divide-x divide-slate-100 dark:divide-slate-700">
+        {items.map((item) => (
+          <StatItem key={item.label} item={item} />
+        ))}
       </div>
-    </CardBody>
+    </Card>
+  );
+}
+
+function StatItem({ item }: { item: StatItemData }) {
+  const tone = item.tone ?? "neutral";
+  const roundedDelta = item.trendDelta !== undefined ? Math.round(item.trendDelta) : 0;
+
+  const inner = (
+    <>
+      <div className="flex items-center gap-1.5">
+        <span className="text-sm">{item.icon}</span>
+        <span className={`text-lg font-bold leading-tight ${STAT_TONE_COLOR[tone]}`}>{item.value}</span>
+      </div>
+      <div className="text-xs text-slate-500 dark:text-slate-400">{item.label}</div>
+      {item.trendDelta !== undefined && (
+        <div className="mt-0.5 text-xs font-medium text-slate-400 dark:text-slate-500" title="Rispetto al periodo precedente">
+          {roundedDelta === 0 ? "–" : roundedDelta > 0 ? "▲" : "▼"} {Math.abs(roundedDelta)}pt vs prec.
+        </div>
+      )}
+    </>
   );
 
-  if (href) {
+  const className = `min-w-[150px] flex-1 basis-[150px] px-4 py-3 ${
+    item.href || item.onClick ? "text-left transition hover:bg-slate-50 dark:hover:bg-slate-700/50" : ""
+  }`;
+
+  if (item.href) {
     return (
-      <Link href={href}>
-        <Card className="block transition hover:border-brand-300 hover:shadow-md">{body}</Card>
+      <Link href={item.href} className={className}>
+        {inner}
       </Link>
     );
   }
-  if (onClick) {
+  if (item.onClick) {
     return (
-      <button type="button" onClick={onClick} className="block w-full text-left">
-        <Card className="transition hover:border-brand-300 hover:shadow-md">{body}</Card>
+      <button type="button" onClick={item.onClick} className={className}>
+        {inner}
       </button>
     );
   }
-  return <Card>{body}</Card>;
+  return <div className={className}>{inner}</div>;
 }
