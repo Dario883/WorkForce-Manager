@@ -11,6 +11,10 @@ Riscrittura leggera e manutenibile del progetto originale "WorkForce Manager", s
 
 Nessun tRPC, nessun runtime proprietario, nessun SDK di terze parti: solo REST + fetch. Circa 1/3 delle dipendenze dell'originale.
 
+## Documentazione
+
+Documentazione funzionale, architetturale, tecnica e di sicurezza completa: [`docs/`](docs/README.md).
+
 ## Funzionalità
 
 - **Dashboard**: KPI su persone, progetti attivi, sotto/sovra-allocazione
