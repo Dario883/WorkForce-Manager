@@ -96,6 +96,7 @@ erDiagram
         varchar name
         varchar email
         varchar role
+        enum type "consulente/stage/dipendente"
         varchar avatar_color
         real capacity_hours_per_week
         int manager_id FK "self-reference"
@@ -196,6 +197,9 @@ Note di progettazione del modello dati:
   imposta invece `manager_id`/`pm_id` a `null` (`onDelete: "set null"`) —
   non si perdono righe collegate solo perché un riferimento gerarchico
   viene rimosso.
+- **`PEOPLE.type` è un enum applicativo** (`consulente`, `stage`,
+    `dipendente`) usato per classificare la risorsa in UI (badge/filtro) e
+    in import/export CSV delle persone.
 
 ## 5. Modello di dominio (diagramma delle classi)
 

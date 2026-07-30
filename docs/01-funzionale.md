@@ -48,13 +48,14 @@ periodo, richieste in attesa di approvazione. Include inoltre una vista
 soglie configurate in Impostazioni).
 
 ### 3.2 Persone (`/people`, `/people/:id`)
-Anagrafica delle risorse pianificabili: nome, ruolo, email, colore
-identificativo, capacità settimanale base (ore), responsabile gerarchico
-(`managerId`, auto-riferimento sulla stessa tabella), flag "Responsabile"
-(`isApprover`, abilita ad approvare le assenze altrui). CRUD completo,
-import/export CSV. Il dettaglio persona mostra lo storico assegnazioni,
-le assenze e i periodi di capacità variabile (override temporanei della
-capacità base, es. part-time a termine).
+Anagrafica delle risorse pianificabili: nome, ruolo, email, **tipo risorsa**
+(`consulente`/`stage`/`dipendente`), colore identificativo, capacità
+settimanale base (ore), responsabile gerarchico (`managerId`,
+auto-riferimento sulla stessa tabella), flag "Responsabile" (`isApprover`,
+abilita ad approvare le assenze altrui). CRUD completo, import/export CSV.
+Il dettaglio persona mostra lo storico assegnazioni, le assenze e i periodi
+di capacità variabile (override temporanei della capacità base, es.
+part-time a termine).
 
 ### 3.3 Progetti (`/projects`, `/projects/:id`)
 Anagrafica commesse: nome, cliente, stato (`planned`/`active`/`on_hold`/
@@ -74,7 +75,10 @@ vista del portfolio di un singolo PM, con filtro temporale (settimana/mese/anno)
 Elenco/gestione delle assegnazioni persona↔progetto↔percentuale↔periodo.
 Da qui si creano nuove assegnazioni, anche con opzione "sovrascrivi" che
 gestisce automaticamente la sovrapposizione con assegnazioni esistenti sullo
-stesso progetto (vedi [§4.1](#41-allocazione-e-staffing)). Import/export CSV.
+stesso progetto (vedi [§4.1](#41-allocazione-e-staffing)). In creazione,
+la UI mostra conferme esplicite in due casi: nuova allocazione che porta la
+persona oltre il 100% nel periodo selezionato, oppure progetto selezionato
+con stato diverso da `active`. Import/export CSV.
 
 ### 3.6 Calendario (`/calendar`)
 Vista a griglia persona × periodo (settimana/mese/anno), con due modalità:
@@ -114,6 +118,10 @@ Un'assegnazione (`assignments`) collega una persona a un progetto per un
 periodo con una percentuale di impegno. Più assegnazioni sullo stesso giorno
 si **sommano** (una persona può essere staffata al 60% su un progetto e al
 40% su un altro nella stessa settimana → 100% totale).
+
+In fase di inserimento da UI, prima del salvataggio il sistema chiede
+conferma all'utente se la nuova riga comporta **sovra-allocazione >100%**
+nel periodo o se il progetto è in stato diverso da `active`.
 
 Due operazioni meritano attenzione perché contengono la logica di dominio
 più delicata del sistema:
@@ -210,7 +218,9 @@ valide (dati mancanti, persona/progetto non trovati per nome, date non
 riconosciute) vengono **saltate** singolarmente — l'importazione non fallisce
 nel suo complesso — e la risposta riporta quante righe sono state importate e
 quante saltate, così l'utente può correggere e ripetere solo quelle
-mancanti.
+mancanti. Per le Persone, la risposta include anche il **motivo puntuale per
+riga** (es. nome mancante, tipo non valido, capacità non valida) mostrato
+nel popup lato UI.
 
 ## 5. Casi d'uso principali
 

@@ -102,6 +102,10 @@ setup-deploy.ps1              → script di provisioning iniziale delle risorse 
    assegnazioni, assenze, utenti) scrivono una riga in `activity_log` tramite
    `logActivity()` — un fallimento di questa scrittura viene loggato ma
    **non fa fallire la richiesta originale**.
+6. Nella creazione/modifica assegnazioni, `AssignmentModal` applica due
+  guard-rail lato UX prima della chiamata API: conferma in caso di
+  sovra-allocazione >100% nel periodo e conferma se il progetto è in stato
+  diverso da `active`.
 
 ## 4. Riferimento API
 
@@ -124,6 +128,11 @@ indicato — vedi [04-sicurezza.md](04-sicurezza.md) per il dettaglio completo.
 | Impostazioni soglie | `GET/PUT /settings` | `settings` + `settings:thresholds` |
 | Utenti | `GET/POST /users`, `PUT/DELETE /users/:id` | `settings` + `settings:users` (**incluse le GET**) |
 | Registro attività | `GET /activity` | `settings` + `settings:activity` (**incluse le GET**) |
+
+Note endpoint:
+- `POST /people/import` restituisce anche `errors: { row, reason }[]` in caso
+  di righe scartate, così il frontend può mostrare il motivo puntuale nel
+  popup di import.
 
 ## 5. Testing
 

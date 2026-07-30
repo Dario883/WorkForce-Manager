@@ -31,4 +31,4 @@ degli editor Markdown (incluso VS Code con l'estensione Markdown Preview Mermaid
 - **Repository**: `Dario883/WorkForce-Manager` (fork di deploy)
 - **Ambiente di produzione**: Azure App Service + Azure Database for PostgreSQL Flexible Server
 - **CI/CD**: GitHub Actions — job `test` (typecheck + unit + integration + e2e) blocca il job `build-and-deploy`
-- **Ultimo aggiornamento di questa documentazione**: 2026-07-29
+- **Ultimo aggiornamento di questa documentazione**: 2026-07-30
