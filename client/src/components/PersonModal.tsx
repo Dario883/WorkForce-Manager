@@ -1,12 +1,24 @@
 import { useEffect, useState } from "react";
-import { api } from "../lib/api";
-import type { Person } from "@shared/types";
+import { api, ApiError } from "../lib/api";
+import type { Person, PersonType } from "@shared/types";
 import Button from "./Button";
 import Modal from "./Modal";
 import { Field, Input, Select } from "./ui";
 
 // Same validated categorical palette used for project colors (see ProjectModal).
 const COLORS = ["#3987e5", "#d95926", "#199e70", "#c98500", "#d55181", "#008300"];
+
+export const PERSON_TYPE_LABEL: Record<PersonType, string> = {
+  dipendente: "Dipendente",
+  consulente: "Consulente",
+  stage: "Stage",
+};
+
+export const PERSON_TYPE_COLOR: Record<PersonType, string> = {
+  dipendente: "#3457d5",
+  consulente: "#7c3aed",
+  stage: "#d97706",
+};
 
 // Stable reference: see AssignmentModal's NO_PEOPLE for why a fresh `[]`
 // default would be unsafe as a useEffect dependency.
@@ -28,6 +40,7 @@ export default function PersonModal({
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [role, setRole] = useState("");
+  const [type, setType] = useState<PersonType>("dipendente");
   const [capacity, setCapacity] = useState(40);
   const [managerId, setManagerId] = useState<number | "">("");
   const [isApprover, setIsApprover] = useState(false);
@@ -39,6 +52,7 @@ export default function PersonModal({
       setName(person.name);
       setEmail(person.email ?? "");
       setRole(person.role ?? "");
+      setType(person.type);
       setCapacity(person.capacityHoursPerWeek);
       setManagerId(person.managerId ?? "");
       setIsApprover(person.isApprover);
@@ -47,6 +61,7 @@ export default function PersonModal({
       setName("");
       setEmail("");
       setRole("");
+      setType("dipendente");
       setCapacity(40);
       setManagerId("");
       setIsApprover(false);
@@ -68,6 +83,7 @@ export default function PersonModal({
       name,
       email: email || null,
       role: role || null,
+      type,
       capacityHoursPerWeek: capacity,
       managerId: managerId === "" ? null : managerId,
       isApprover,
@@ -80,6 +96,8 @@ export default function PersonModal({
         await api.post("/people", payload);
       }
       onSaved();
+    } catch (err) {
+      alert(err instanceof ApiError ? err.message : "Errore durante il salvataggio della persona.");
     } finally {
       setSaving(false);
     }
@@ -93,6 +111,15 @@ export default function PersonModal({
         </Field>
         <Field label="Ruolo">
           <Input value={role} onChange={(e) => setRole(e.target.value)} placeholder="es. Developer" />
+        </Field>
+        <Field label="Tipo">
+          <Select value={type} onChange={(e) => setType(e.target.value as PersonType)}>
+            {Object.entries(PERSON_TYPE_LABEL).map(([value, label]) => (
+              <option key={value} value={value}>
+                {label}
+              </option>
+            ))}
+          </Select>
         </Field>
         <Field label="Email">
           <Input type="email" value={email} onChange={(e) => setEmail(e.target.value)} />

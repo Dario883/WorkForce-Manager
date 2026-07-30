@@ -1,12 +1,12 @@
 import { useEffect, useRef, useState } from "react";
 import { Link } from "wouter";
 import { format } from "date-fns";
-import { api } from "../lib/api";
-import type { Person, Settings, StaffingSnapshot } from "@shared/types";
+import { api, ApiError } from "../lib/api";
+import type { Person, PersonType, Settings, StaffingSnapshot } from "@shared/types";
 import { Card, CardBody } from "../components/Card";
 import Button from "../components/Button";
 import { Badge, Input, Select, SortableTh } from "../components/ui";
-import PersonModal from "../components/PersonModal";
+import PersonModal, { PERSON_TYPE_COLOR, PERSON_TYPE_LABEL } from "../components/PersonModal";
 import { compareValues, useSortable } from "../lib/sort";
 
 type SortKey = "name" | "role" | "email" | "capacityHoursPerWeek" | "allocation";
@@ -27,6 +27,7 @@ export default function PeoplePage() {
   const [editing, setEditing] = useState<Person | null>(null);
   const [search, setSearch] = useState("");
   const [roleFilter, setRoleFilter] = useState("");
+  const [typeFilter, setTypeFilter] = useState<PersonType | "">("");
   const [approverFilter, setApproverFilter] = useState<"all" | "yes" | "no">("all");
   const fileInputRef = useRef<HTMLInputElement>(null);
   const { sortKey, sortDir, onSort } = useSortable<SortKey>("name");
@@ -35,6 +36,7 @@ export default function PeoplePage() {
 
   const filteredPeople = people.filter((p) => {
     if (roleFilter && p.role !== roleFilter) return false;
+    if (typeFilter && p.type !== typeFilter) return false;
     if (approverFilter === "yes" && !p.isApprover) return false;
     if (approverFilter === "no" && p.isApprover) return false;
     const q = search.trim().toLowerCase();
@@ -97,10 +99,25 @@ export default function PeoplePage() {
     const file = e.target.files?.[0];
     if (!file) return;
     const text = await file.text();
-    const result = await api.post<{ imported: number }>("/people/import", { csv: text });
-    alert(`Importate ${result.imported} persone.`);
-    load();
-    if (fileInputRef.current) fileInputRef.current.value = "";
+    try {
+      const result = await api.post<{ imported: number; skipped?: number; errors?: { row: number; reason: string }[] }>(
+        "/people/import",
+        { csv: text }
+      );
+      let message = `Importate ${result.imported} persone.`;
+      if (result.skipped) {
+        message += ` ${result.skipped} righe saltate.`;
+        if (result.errors?.length) {
+          message += "\n\n" + result.errors.map((e) => `Riga ${e.row}: ${e.reason}`).join("\n");
+        }
+      }
+      alert(message);
+      load();
+    } catch (err) {
+      alert(err instanceof ApiError ? `Import fallito: ${err.message}` : "Import fallito: errore imprevisto.");
+    } finally {
+      if (fileInputRef.current) fileInputRef.current.value = "";
+    }
   }
 
   function handleExport() {
@@ -157,6 +174,14 @@ export default function PeoplePage() {
             </option>
           ))}
         </Select>
+        <Select value={typeFilter} onChange={(e) => setTypeFilter(e.target.value as PersonType | "")} className="sm:w-48">
+          <option value="">Tutti i tipi</option>
+          {Object.entries(PERSON_TYPE_LABEL).map(([value, label]) => (
+            <option key={value} value={value}>
+              {label}
+            </option>
+          ))}
+        </Select>
         <Select value={approverFilter} onChange={(e) => setApproverFilter(e.target.value as "all" | "yes" | "no")} className="sm:w-56">
           <option value="all">Tutti</option>
           <option value="yes">Solo responsabili</option>
@@ -178,6 +203,7 @@ export default function PeoplePage() {
                 <tr>
                   <SortableTh label="Nome" sortKey="name" currentKey={sortKey} currentDir={sortDir} onSort={onSort} />
                   <SortableTh label="Ruolo" sortKey="role" currentKey={sortKey} currentDir={sortDir} onSort={onSort} />
+                  <th className="px-5 py-3">Tipo</th>
                   <SortableTh label="Email" sortKey="email" currentKey={sortKey} currentDir={sortDir} onSort={onSort} />
                   <SortableTh
                     label="Capacità (h/sett.)"
@@ -212,6 +238,9 @@ export default function PeoplePage() {
                       </Link>
                     </td>
                     <td className="px-5 py-3 text-slate-600 dark:text-slate-300">{p.role || "—"}</td>
+                    <td className="px-5 py-3">
+                      <Badge color={PERSON_TYPE_COLOR[p.type]}>{PERSON_TYPE_LABEL[p.type]}</Badge>
+                    </td>
                     <td className="px-5 py-3 text-slate-600 dark:text-slate-300">{p.email || "—"}</td>
                     <td className="px-5 py-3 text-slate-600 dark:text-slate-300">{p.capacityHoursPerWeek}h</td>
                     <td className="px-5 py-3">

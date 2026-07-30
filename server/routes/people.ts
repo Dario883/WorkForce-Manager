@@ -10,10 +10,13 @@ import { logActivity } from "../activityLog";
 
 export const peopleRouter = Router();
 
+const PERSON_TYPES = ["consulente", "stage", "dipendente"] as const;
+
 const personSchema = z.object({
   name: z.string().min(1),
   email: z.string().email().optional().nullable(),
   role: z.string().optional().nullable(),
+  type: z.enum(PERSON_TYPES).default("dipendente"),
   avatarColor: z.string().default("#3457d5"),
   capacityHoursPerWeek: z.number().positive().default(40),
   managerId: z.number().int().positive().optional().nullable(),
@@ -29,6 +32,7 @@ peopleRouter.get("/", asyncHandler(async (_req, res) => {
       name: people.name,
       email: people.email,
       role: people.role,
+      type: people.type,
       avatarColor: people.avatarColor,
       capacityHoursPerWeek: people.capacityHoursPerWeek,
       managerId: people.managerId,
@@ -45,8 +49,8 @@ peopleRouter.get("/", asyncHandler(async (_req, res) => {
 
 peopleRouter.get("/csv-template", (_req, res) => {
   const csv = Papa.unparse({
-    fields: ["name", "email", "role", "capacityHoursPerWeek", "avatarColor"],
-    data: [["Mario Rossi", "mario.rossi@example.com", "Developer", "40", "#3457d5"]],
+    fields: ["name", "email", "role", "type", "capacityHoursPerWeek", "avatarColor"],
+    data: [["Mario Rossi", "mario.rossi@example.com", "Developer", "dipendente", "40", "#3457d5"]],
   });
   res.header("Content-Type", "text/csv");
   res.attachment("people-template.csv");
@@ -60,6 +64,7 @@ peopleRouter.get("/export", asyncHandler(async (_req, res) => {
       name: p.name,
       email: p.email ?? "",
       role: p.role ?? "",
+      type: p.type,
       capacityHoursPerWeek: p.capacityHoursPerWeek,
       avatarColor: p.avatarColor,
     }))
@@ -78,19 +83,46 @@ peopleRouter.post("/import", asyncHandler(async (req, res) => {
   const rows = result.data as Record<string, string>[];
 
   let imported = 0;
-  for (const row of rows) {
+  const errors: { row: number; reason: string }[] = [];
+  for (const [index, row] of rows.entries()) {
+    const rowNumber = index + 2; // +1 for header row, +1 for 1-based numbering
+    const name = row.name?.trim();
+    if (!name) {
+      errors.push({ row: rowNumber, reason: "Nome mancante" });
+      continue;
+    }
+
+    const typeRaw = row.type?.trim().toLowerCase();
+    if (typeRaw && !(PERSON_TYPES as readonly string[]).includes(typeRaw)) {
+      errors.push({ row: rowNumber, reason: `Tipo non valido: "${row.type}" (valori ammessi: ${PERSON_TYPES.join(", ")})` });
+      continue;
+    }
+
+    const capacityRaw = row.capacityHoursPerWeek?.trim();
+    const capacityHoursPerWeek = capacityRaw ? Number(capacityRaw) : 40;
+    if (Number.isNaN(capacityHoursPerWeek) || capacityHoursPerWeek <= 0) {
+      errors.push({ row: rowNumber, reason: `Capacità non valida: "${row.capacityHoursPerWeek}"` });
+      continue;
+    }
+
     const candidate = {
-      name: row.name?.trim(),
+      name,
       email: row.email?.trim() || null,
       role: row.role?.trim() || null,
-      capacityHoursPerWeek: row.capacityHoursPerWeek ? Number(row.capacityHoursPerWeek) : 40,
+      type: (typeRaw || "dipendente") as (typeof PERSON_TYPES)[number],
+      capacityHoursPerWeek,
       avatarColor: row.avatarColor?.trim() || "#3457d5",
     };
-    if (!candidate.name) continue;
-    await db.insert(people).values(candidate);
-    imported++;
+
+    try {
+      await db.insert(people).values(candidate);
+      imported++;
+    } catch (err) {
+      console.error("Errore import persona:", row, err);
+      errors.push({ row: rowNumber, reason: "Errore durante il salvataggio" });
+    }
   }
-  res.json({ imported });
+  res.json({ imported, skipped: errors.length, errors });
 }));
 
 peopleRouter.get("/:id", asyncHandler(async (req, res) => {

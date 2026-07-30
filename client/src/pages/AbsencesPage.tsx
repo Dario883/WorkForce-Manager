@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Link } from "wouter";
 import { differenceInCalendarDays } from "date-fns";
-import { api } from "../lib/api";
+import { api, ApiError } from "../lib/api";
 import type { Absence, AbsenceStatus, AbsenceType, Person } from "@shared/types";
 import { Card, CardBody, CardHeader } from "../components/Card";
 import Button from "../components/Button";
@@ -144,11 +144,16 @@ export default function AbsencesPage() {
     const file = e.target.files?.[0];
     if (!file) return;
     const text = await file.text();
-    const result = await api.post<{ imported: number; skipped?: number }>("/absences/import", { csv: text });
-    const skippedMsg = result.skipped ? ` (${result.skipped} righe saltate per dati non validi)` : "";
-    alert(`Importate ${result.imported} assenze.${skippedMsg}`);
-    load();
-    if (fileInputRef.current) fileInputRef.current.value = "";
+    try {
+      const result = await api.post<{ imported: number; skipped?: number }>("/absences/import", { csv: text });
+      const skippedMsg = result.skipped ? ` (${result.skipped} righe saltate per dati non validi)` : "";
+      alert(`Importate ${result.imported} assenze.${skippedMsg}`);
+      load();
+    } catch (err) {
+      alert(err instanceof ApiError ? `Import fallito: ${err.message}` : "Import fallito: errore imprevisto.");
+    } finally {
+      if (fileInputRef.current) fileInputRef.current.value = "";
+    }
   }
 
   return (

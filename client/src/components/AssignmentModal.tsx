@@ -1,9 +1,10 @@
 import { useEffect, useState } from "react";
-import { api } from "../lib/api";
+import { api, ApiError } from "../lib/api";
 import type { Assignment, Person, Project, PeriodType } from "@shared/types";
 import Button from "./Button";
 import Modal from "./Modal";
 import { Field, Input, Select } from "./ui";
+import { STATUS_LABEL } from "./ProjectModal";
 
 // Stable reference: a fresh `[]` default value would recreate the array on
 // every render, and since `people` is a useEffect dependency below, that
@@ -63,6 +64,15 @@ export default function AssignmentModal({
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     if (personId === "" || projectId === "") return;
+
+    const project = projects.find((p) => p.id === projectId);
+    if (project && project.status !== "active") {
+      const proceed = confirm(
+        `Stai allocando una risorsa su un progetto in stato "${STATUS_LABEL[project.status]}". Vuoi continuare?`
+      );
+      if (!proceed) return;
+    }
+
     setSaving(true);
     const payload = {
       personId: Number(personId),
@@ -73,6 +83,24 @@ export default function AssignmentModal({
       periodType,
     };
     try {
+      const existing = await api.get<Assignment[]>(`/assignments?personId=${personId}`);
+      const overlapPercentage = existing
+        .filter((a) => {
+          if (a.id === assignment?.id) return false;
+          // Rows for the same project will be truncated/replaced by the
+          // overwrite endpoint, so they shouldn't count towards the total.
+          if (mode === "overwrite" && !assignment && a.projectId === Number(projectId)) return false;
+          return a.startDate <= endDate && a.endDate >= startDate;
+        })
+        .reduce((sum, a) => sum + a.percentage, 0);
+      const projectedTotal = overlapPercentage + percentage;
+      if (projectedTotal > 100) {
+        const proceed = confirm(
+          `La risorsa risulterebbe allocata al ${projectedTotal}% nel periodo selezionato (oltre il 100%). Vuoi continuare?`
+        );
+        if (!proceed) return;
+      }
+
       if (assignment) {
         await api.put(`/assignments/${assignment.id}`, payload);
       } else if (mode === "overwrite") {
@@ -81,6 +109,8 @@ export default function AssignmentModal({
         await api.post("/assignments", payload);
       }
       onSaved();
+    } catch (err) {
+      alert(err instanceof ApiError ? err.message : "Errore durante il salvataggio dell'assegnazione.");
     } finally {
       setSaving(false);
     }

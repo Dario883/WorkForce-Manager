@@ -3,12 +3,14 @@ export type PeriodType = "day" | "week" | "month" | "year";
 export type DeliveryType = "TK" | "T&M" | "TaaS" | "AMS";
 export type AbsenceType = "ferie" | "malattia" | "permesso" | "formazione" | "altro";
 export type AbsenceStatus = "in_attesa" | "approvata" | "rifiutata";
+export type PersonType = "consulente" | "stage" | "dipendente";
 
 export interface Person {
   id: number;
   name: string;
   email: string | null;
   role: string | null;
+  type: PersonType;
   avatarColor: string;
   capacityHoursPerWeek: number;
   managerId: number | null;

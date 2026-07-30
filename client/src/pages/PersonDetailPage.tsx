@@ -6,7 +6,7 @@ import type { Absence, CapacityPeriod, Person } from "@shared/types";
 import { Card, CardBody, CardHeader } from "../components/Card";
 import Button from "../components/Button";
 import { Badge, Field, Input } from "../components/ui";
-import PersonModal from "../components/PersonModal";
+import PersonModal, { PERSON_TYPE_COLOR, PERSON_TYPE_LABEL } from "../components/PersonModal";
 import { ABSENCE_COLOR, ABSENCE_LABEL, ABSENCE_STATUS_COLOR, ABSENCE_STATUS_LABEL } from "../components/AbsenceModal";
 
 interface PersonAssignment {
@@ -103,7 +103,10 @@ export default function PersonDetailPage({ id }: { id: number }) {
             {person.name.slice(0, 1).toUpperCase()}
           </span>
           <div>
-            <h1 className="text-2xl font-bold text-slate-900 dark:text-slate-100">{person.name}</h1>
+            <h1 className="text-2xl font-bold text-slate-900 dark:text-slate-100">
+              {person.name}{" "}
+              <Badge color={PERSON_TYPE_COLOR[person.type]}>{PERSON_TYPE_LABEL[person.type]}</Badge>
+            </h1>
             <p className="text-sm text-slate-500 dark:text-slate-400">
               {person.role || "Ruolo non specificato"} · {person.capacityHoursPerWeek}h/settimana
               {person.managerName && person.managerId && (

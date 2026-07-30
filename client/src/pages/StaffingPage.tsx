@@ -1,6 +1,6 @@
 import { Fragment, useEffect, useRef, useState } from "react";
 import { Link } from "wouter";
-import { api } from "../lib/api";
+import { api, ApiError } from "../lib/api";
 import type { Assignment, Person, Project } from "@shared/types";
 import { Card, CardBody } from "../components/Card";
 import Button from "../components/Button";
@@ -95,11 +95,16 @@ export default function StaffingPage() {
     const file = e.target.files?.[0];
     if (!file) return;
     const text = await file.text();
-    const result = await api.post<{ imported: number; skipped?: number }>("/assignments/import", { csv: text });
-    const skippedMsg = result.skipped ? ` (${result.skipped} righe saltate per dati non validi)` : "";
-    alert(`Importate ${result.imported} assegnazioni.${skippedMsg}`);
-    load();
-    if (fileInputRef.current) fileInputRef.current.value = "";
+    try {
+      const result = await api.post<{ imported: number; skipped?: number }>("/assignments/import", { csv: text });
+      const skippedMsg = result.skipped ? ` (${result.skipped} righe saltate per dati non validi)` : "";
+      alert(`Importate ${result.imported} assegnazioni.${skippedMsg}`);
+      load();
+    } catch (err) {
+      alert(err instanceof ApiError ? `Import fallito: ${err.message}` : "Import fallito: errore imprevisto.");
+    } finally {
+      if (fileInputRef.current) fileInputRef.current.value = "";
+    }
   }
 
   return (

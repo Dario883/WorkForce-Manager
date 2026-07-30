@@ -48,6 +48,12 @@ export const absenceStatusEnum = pgEnum("absence_status", [
   "rifiutata",
 ]);
 
+export const personTypeEnum = pgEnum("person_type", [
+  "consulente",
+  "stage",
+  "dipendente",
+]);
+
 // ── Users (auth) ──────────────────────────────────────────────────────────
 export const users = pgTable("users", {
   id: serial("id").primaryKey(),
@@ -68,6 +74,7 @@ export const people = pgTable("people", {
   name: varchar("name", { length: 255 }).notNull(),
   email: varchar("email", { length: 255 }),
   role: varchar("role", { length: 255 }),
+  type: personTypeEnum("type").default("dipendente").notNull(),
   avatarColor: varchar("avatar_color", { length: 32 }).default("#3457d5").notNull(),
   capacityHoursPerWeek: real("capacity_hours_per_week").default(40).notNull(),
   managerId: integer("manager_id").references((): AnyPgColumn => people.id, { onDelete: "set null" }),
