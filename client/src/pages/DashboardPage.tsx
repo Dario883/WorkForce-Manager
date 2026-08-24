@@ -312,6 +312,27 @@ export default function DashboardPage() {
     });
   }
 
+  function openPersonAllocationDrilldown(person: { personId: number; personName: string; avg: number }) {
+    const rows = periodAssignments
+      .filter((a) => a.personId === person.personId)
+      .map((a) => ({
+        label: a.projectName ?? "—",
+        value: `${a.percentage}%`,
+        color:
+          a.percentage < underThreshold ? "#f59e0b" : a.percentage <= overThreshold ? "#10b981" : "#ef4444",
+        href: `/projects/${a.projectId}`,
+      }));
+
+    setDrilldown({
+      title: `Allocazione · ${person.personName}`,
+      subtitle: `Media nel periodo: ${Math.round(person.avg)}%`,
+      rows:
+        rows.length > 0
+          ? rows
+          : [{ label: "Nessuna allocazione nel periodo selezionato", value: "" }],
+    });
+  }
+
   function openOutOfThresholdDrilldown() {
     const rows = [...underAllocated, ...overAllocated]
       .sort((a, b) => a.avg - b.avg)
@@ -319,12 +340,20 @@ export default function DashboardPage() {
         label: p.personName,
         value: `${Math.round(p.avg)}%`,
         color: p.avg < underThreshold ? "#d97706" : "#dc2626",
-        href: `/people/${p.personId}`,
+        onClick: () => openPersonAllocationDrilldown(p),
       }));
     setDrilldown({
       title: "Persone fuori soglia",
       subtitle: `Sotto ${underThreshold}% o sopra ${overThreshold}% — media nel periodo`,
-      rows: rows.length > 0 ? rows : [{ label: "Nessuna persona fuori soglia", value: "" }],
+      rows:
+        rows.length > 0
+          ? rows.map((r) => ({
+              label: r.label,
+              value: r.value,
+              color: r.color,
+              href: `/people/${[...underAllocated, ...overAllocated].find((p) => p.personName === r.label)?.personId ?? ""}`,
+            }))
+          : [{ label: "Nessuna persona fuori soglia", value: "" }],
     });
   }
 
@@ -475,7 +504,7 @@ export default function DashboardPage() {
       </div>
 
       <Card>
-        <CardHeader className="flex items-center justify-between">
+        <CardHeader className="flex items-center justify-between gap-4">
           <div>
             <h2 className="font-semibold text-slate-800 dark:text-slate-100">Allocazione per persona</h2>
             <p className="text-xs text-slate-500 dark:text-slate-400">Media nel periodo selezionato</p>
@@ -484,68 +513,60 @@ export default function DashboardPage() {
             Modifica soglie →
           </Link>
         </CardHeader>
-        <CardBody className="space-y-3">
-          {avgPerPerson.length === 0 && (
-            <p className="py-4 text-center text-sm text-slate-400 dark:text-slate-500">Nessun dato per il periodo selezionato</p>
-          )}
-          {[...avgPerPerson]
-            .sort((a, b) => b.avg - a.avg)
-            .map((p) => {
-              const pct = Math.min(Math.max(p.avg, 0), METER_MAX);
-              const fillWidth = (pct / METER_MAX) * 100;
-              const underMarker = Math.min(Math.max((underThreshold / METER_MAX) * 100, 0), 100);
-              const overMarker = Math.min(Math.max((overThreshold / METER_MAX) * 100, 0), 100);
-              const color =
-                p.avg === 0
-                  ? "#94a3b8"
-                  : p.avg < underThreshold
-                  ? "#f59e0b"
-                  : p.avg <= overThreshold
-                  ? "#10b981"
-                  : "#ef4444";
+        <CardBody className="space-y-3 p-3">
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="rounded-full border border-amber-200 bg-amber-50 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-amber-700 dark:border-amber-500/30 dark:bg-amber-500/10 dark:text-amber-300">
+              Sotto: {underAllocated.length}
+            </span>
+            <span className="rounded-full border border-emerald-200 bg-emerald-50 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-emerald-700 dark:border-emerald-500/30 dark:bg-emerald-500/10 dark:text-emerald-300">
+              OK: {avgPerPerson.filter((p) => p.avg >= underThreshold && p.avg <= overThreshold).length}
+            </span>
+            <span className="rounded-full border border-red-200 bg-red-50 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-red-700 dark:border-red-500/30 dark:bg-red-500/10 dark:text-red-300">
+              Sovra: {overAllocated.length}
+            </span>
+          </div>
 
-              return (
-                <Link
-                  key={p.personId}
-                  href={`/people/${p.personId}`}
-                  className="group block rounded-lg border border-slate-200 bg-slate-50/50 px-3 py-2 transition hover:border-slate-300 hover:bg-slate-100/80 dark:border-slate-700 dark:bg-slate-800/40 dark:hover:border-slate-600 dark:hover:bg-slate-700/60"
-                >
-                  <div className="mb-2 flex items-center justify-between gap-3 text-[11px] uppercase tracking-[0.12em] text-slate-400 dark:text-slate-500">
-                    <span>{p.personName}</span>
-                    <span className="font-semibold text-slate-600 dark:text-slate-200">{Math.round(p.avg)}%</span>
-                  </div>
-                  <div className="relative h-3 overflow-hidden rounded-full bg-slate-200 dark:bg-slate-700">
-                    <div className="absolute inset-0 bg-gradient-to-r from-slate-200/30 to-transparent" />
-                    <div
-                      className="absolute inset-y-0 left-0 rounded-full"
-                      style={{ width: `${fillWidth}%`, background: color }}
-                      title={`${p.personName}: ${Math.round(p.avg)}% (media periodo)`}
-                    />
-                    <div className="absolute inset-y-0 w-[1px] bg-slate-500/70" style={{ left: `${underMarker}%` }} />
-                    <div className="absolute inset-y-0 w-[1px] bg-slate-700/70" style={{ left: `${overMarker}%` }} />
-                  </div>
-                </Link>
-              );
-            })}
+          {avgPerPerson.length === 0 && (
+            <p className="py-3 text-center text-xs text-slate-400 dark:text-slate-500">Nessun dato per il periodo selezionato</p>
+          )}
+
+          <div className="space-y-1.5">
+            {[...avgPerPerson]
+              .sort((a, b) => b.avg - a.avg)
+              .map((p) => {
+                const pct = Math.min(Math.max(p.avg, 0), METER_MAX);
+                const fillWidth = (pct / METER_MAX) * 100;
+                const color =
+                  p.avg === 0
+                    ? "#94a3b8"
+                    : p.avg < underThreshold
+                    ? "#f59e0b"
+                    : p.avg <= overThreshold
+                    ? "#10b981"
+                    : "#ef4444";
+
+                return (
+                  <button
+                    key={p.personId}
+                    type="button"
+                    onClick={() => openPersonAllocationDrilldown(p)}
+                    className="w-full rounded-md border border-slate-200 bg-slate-50/60 px-2 py-1.5 text-left transition hover:border-slate-300 hover:bg-slate-100/80 dark:border-slate-700 dark:bg-slate-800/40 dark:hover:border-slate-600 dark:hover:bg-slate-700/60"
+                  >
+                    <div className="mb-1.5 flex items-center justify-between gap-3">
+                      <span className="truncate text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-600 dark:text-slate-200">
+                        {p.personName}
+                      </span>
+                      <span className="text-[10px] font-bold text-slate-700 dark:text-slate-100">{Math.round(p.avg)}%</span>
+                    </div>
+                    <div className="relative h-2.5 overflow-hidden rounded-full bg-slate-200 dark:bg-slate-700">
+                      <div className="absolute inset-y-0 left-0 w-full bg-gradient-to-r from-slate-200/20 to-transparent" />
+                      <div className="absolute inset-y-0 left-0 rounded-full" style={{ width: `${fillWidth}%`, background: color }} />
+                    </div>
+                  </button>
+                );
+              })}
+          </div>
         </CardBody>
-        <div className="flex flex-wrap items-center gap-3 border-t border-slate-100 px-5 py-3 text-[11px] uppercase tracking-[0.08em] text-slate-500 dark:border-slate-700 dark:text-slate-400">
-          <span className="flex items-center gap-1.5">
-            <span className="h-2.5 w-2.5 rounded-full bg-slate-400" />
-            0
-          </span>
-          <span className="flex items-center gap-1.5">
-            <span className="h-2.5 w-2.5 rounded-full bg-amber-400" />
-            {`< ${underThreshold}`}
-          </span>
-          <span className="flex items-center gap-1.5">
-            <span className="h-2.5 w-2.5 rounded-full bg-emerald-500" />
-            {`${underThreshold}-${overThreshold}`}
-          </span>
-          <span className="flex items-center gap-1.5">
-            <span className="h-2.5 w-2.5 rounded-full bg-red-500" />
-            {`> ${overThreshold}`}
-          </span>
-        </div>
       </Card>
 
       <div className="mt-4 grid grid-cols-1 gap-4 lg:grid-cols-3">
