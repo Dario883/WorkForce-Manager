@@ -72,6 +72,7 @@ export default function DashboardPage() {
   const [allAbsences, setAllAbsences] = useState<Absence[]>([]);
   const [settings, setSettings] = useState<Settings | null>(null);
   const [loading, setLoading] = useState(true);
+  const [allocationExpanded, setAllocationExpanded] = useState(true);
   const [drilldown, setDrilldown] = useState<{
     title: string;
     subtitle?: string;
@@ -516,71 +517,83 @@ export default function DashboardPage() {
 
       <Card>
         <CardHeader className="flex items-center justify-between gap-4">
-          <div>
-            <h2 className="font-semibold text-slate-800 dark:text-slate-100">Allocazione per persona</h2>
-            <p className="text-xs text-slate-500 dark:text-slate-400">Media nel periodo selezionato</p>
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() => setAllocationExpanded((v) => !v)}
+              className="inline-flex h-6 w-6 items-center justify-center rounded border border-slate-300 bg-white text-sm font-semibold text-slate-700 shadow-sm transition hover:border-slate-400 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100"
+              aria-label={allocationExpanded ? "Collassa allocazioni" : "Espandi allocazioni"}
+            >
+              {allocationExpanded ? "−" : "+"}
+            </button>
+            <div>
+              <h2 className="font-semibold text-slate-800 dark:text-slate-100">Allocazione per persona</h2>
+              <p className="text-xs text-slate-500 dark:text-slate-400">Media nel periodo selezionato</p>
+            </div>
           </div>
           <Link href="/settings" className="text-xs font-medium text-brand-600 hover:underline">
             Modifica soglie →
           </Link>
         </CardHeader>
-        <CardBody className="space-y-3 p-3">
-          <div className="flex flex-wrap items-center gap-2">
-            <span className="rounded-full border border-amber-200 bg-amber-50 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-amber-700 dark:border-amber-500/30 dark:bg-amber-500/10 dark:text-amber-300">
-              Sotto: {underAllocated.length}
-            </span>
-            <span className="rounded-full border border-emerald-200 bg-emerald-50 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-emerald-700 dark:border-emerald-500/30 dark:bg-emerald-500/10 dark:text-emerald-300">
-              OK: {avgPerPerson.filter((p) => p.avg >= underThreshold && p.avg <= overThreshold).length}
-            </span>
-            <span className="rounded-full border border-red-200 bg-red-50 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-red-700 dark:border-red-500/30 dark:bg-red-500/10 dark:text-red-300">
-              Sovra: {overAllocated.length}
-            </span>
-          </div>
+        {allocationExpanded && (
+          <CardBody className="space-y-3 p-3">
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="rounded-full border border-amber-200 bg-amber-50 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-amber-700 dark:border-amber-500/30 dark:bg-amber-500/10 dark:text-amber-300">
+                Sotto: {underAllocated.length}
+              </span>
+              <span className="rounded-full border border-emerald-200 bg-emerald-50 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-emerald-700 dark:border-emerald-500/30 dark:bg-emerald-500/10 dark:text-emerald-300">
+                OK: {avgPerPerson.filter((p) => p.avg >= underThreshold && p.avg <= overThreshold).length}
+              </span>
+              <span className="rounded-full border border-red-200 bg-red-50 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-red-700 dark:border-red-500/30 dark:bg-red-500/10 dark:text-red-300">
+                Sovra: {overAllocated.length}
+              </span>
+            </div>
 
-          {avgPerPerson.length === 0 && (
-            <p className="py-3 text-center text-xs text-slate-400 dark:text-slate-500">Nessun dato per il periodo selezionato</p>
-          )}
+            {avgPerPerson.length === 0 && (
+              <p className="py-3 text-center text-xs text-slate-400 dark:text-slate-500">Nessun dato per il periodo selezionato</p>
+            )}
 
-          <div className="space-y-2">
-            {[...avgPerPerson]
-              .sort((a, b) => b.avg - a.avg)
-              .map((p) => {
-                const pct = Math.min(Math.max(p.avg, 0), METER_MAX);
-                const fillWidth = (pct / METER_MAX) * 100;
-                const color = getAllocationTone(p.avg, underThreshold, overThreshold);
-                const status = getAllocationStatus(p.avg, underThreshold, overThreshold);
+            <div className="space-y-2">
+              {[...avgPerPerson]
+                .sort((a, b) => b.avg - a.avg)
+                .map((p) => {
+                  const pct = Math.min(Math.max(p.avg, 0), METER_MAX);
+                  const fillWidth = (pct / METER_MAX) * 100;
+                  const color = getAllocationTone(p.avg, underThreshold, overThreshold);
+                  const status = getAllocationStatus(p.avg, underThreshold, overThreshold);
 
-                return (
-                  <button
-                    key={p.personId}
-                    type="button"
-                    onClick={() => openPersonAllocationDrilldown(p)}
-                    className="flex w-full items-center gap-3 rounded-md border border-slate-200 bg-slate-50/60 px-2 py-2 text-left transition hover:border-slate-300 hover:bg-slate-100/80 dark:border-slate-700 dark:bg-slate-800/40 dark:hover:border-slate-600 dark:hover:bg-slate-700/60"
-                  >
-                    <div className="w-36 shrink-0 text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-600 dark:text-slate-200">
-                      {p.personName}
-                    </div>
-                    <div className="relative h-3.5 flex-1 overflow-hidden rounded-full bg-slate-200 dark:bg-slate-700">
-                      <div className="absolute inset-y-0 left-0 w-full bg-gradient-to-r from-slate-200/20 to-transparent" />
-                      <div
-                        className="absolute inset-y-0 left-0 rounded-full shadow-[inset_0_0_0_1px_rgba(255,255,255,0.15)]"
-                        style={{ width: `${fillWidth}%`, background: color }}
-                      />
-                      <div className="absolute inset-y-0 left-[70%] border-l border-dashed border-slate-400/70 dark:border-slate-500" />
-                      <div className="absolute inset-y-0 left-[100%] border-l border-slate-300 dark:border-slate-600" />
-                    </div>
-                    <div className="flex w-16 items-center justify-end gap-2">
-                      <span className="text-[11px] font-bold text-slate-700 dark:text-slate-100">{Math.round(p.avg)}%</span>
-                      <span
-                        className="h-2.5 w-2.5 rounded-full"
-                        style={{ backgroundColor: color, boxShadow: status === "ok" ? "0 0 0 2px rgba(16,185,129,0.15)" : "none" }}
-                      />
-                    </div>
-                  </button>
-                );
-              })}
-          </div>
-        </CardBody>
+                  return (
+                    <button
+                      key={p.personId}
+                      type="button"
+                      onClick={() => openPersonAllocationDrilldown(p)}
+                      className="flex w-full items-center gap-3 rounded-md border border-slate-200 bg-slate-50/60 px-2 py-2 text-left transition hover:border-slate-300 hover:bg-slate-100/80 dark:border-slate-700 dark:bg-slate-800/40 dark:hover:border-slate-600 dark:hover:bg-slate-700/60"
+                    >
+                      <div className="w-36 shrink-0 text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-600 dark:text-slate-200">
+                        {p.personName}
+                      </div>
+                      <div className="relative h-3.5 flex-1 overflow-hidden rounded-full bg-slate-200 dark:bg-slate-700">
+                        <div className="absolute inset-y-0 left-0 w-full bg-gradient-to-r from-slate-200/20 to-transparent" />
+                        <div
+                          className="absolute inset-y-0 left-0 rounded-full shadow-[inset_0_0_0_1px_rgba(255,255,255,0.15)]"
+                          style={{ width: `${fillWidth}%`, background: color }}
+                        />
+                        <div className="absolute inset-y-0 left-[70%] border-l border-dashed border-slate-400/70 dark:border-slate-500" />
+                        <div className="absolute inset-y-0 left-[100%] border-l border-slate-300 dark:border-slate-600" />
+                      </div>
+                      <div className="flex w-16 items-center justify-end gap-2">
+                        <span className="text-[11px] font-bold text-slate-700 dark:text-slate-100">{Math.round(p.avg)}%</span>
+                        <span
+                          className="h-2.5 w-2.5 rounded-full"
+                          style={{ backgroundColor: color, boxShadow: status === "ok" ? "0 0 0 2px rgba(16,185,129,0.15)" : "none" }}
+                        />
+                      </div>
+                    </button>
+                  );
+                })}
+            </div>
+          </CardBody>
+        )}
       </Card>
 
       <div className="mt-4 grid grid-cols-1 gap-4 lg:grid-cols-3">
