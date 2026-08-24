@@ -484,61 +484,66 @@ export default function DashboardPage() {
             Modifica soglie →
           </Link>
         </CardHeader>
-        <CardBody className="grid grid-cols-1 gap-x-6 gap-y-3 lg:grid-cols-2">
+        <CardBody className="space-y-3">
           {avgPerPerson.length === 0 && (
-            <p className="py-4 text-center text-sm text-slate-400 dark:text-slate-500 lg:col-span-2">Nessun dato per il periodo selezionato</p>
+            <p className="py-4 text-center text-sm text-slate-400 dark:text-slate-500">Nessun dato per il periodo selezionato</p>
           )}
           {[...avgPerPerson]
             .sort((a, b) => b.avg - a.avg)
             .map((p) => {
-              const pct = Math.min(p.avg, METER_MAX);
+              const pct = Math.min(Math.max(p.avg, 0), METER_MAX);
               const fillWidth = (pct / METER_MAX) * 100;
-              const markerPos = (100 / METER_MAX) * 100;
+              const underMarker = Math.min(Math.max((underThreshold / METER_MAX) * 100, 0), 100);
+              const overMarker = Math.min(Math.max((overThreshold / METER_MAX) * 100, 0), 100);
               const color =
                 p.avg === 0
-                  ? "bg-slate-200"
+                  ? "#94a3b8"
                   : p.avg < underThreshold
-                  ? "bg-amber-400"
+                  ? "#f59e0b"
                   : p.avg <= overThreshold
-                  ? "bg-emerald-500"
-                  : "bg-red-500";
+                  ? "#10b981"
+                  : "#ef4444";
+
               return (
                 <Link
                   key={p.personId}
                   href={`/people/${p.personId}`}
-                  className="block rounded-lg px-2 py-1.5 transition hover:bg-slate-50 dark:hover:bg-slate-700"
+                  className="group block rounded-lg border border-slate-200 bg-slate-50/50 px-3 py-2 transition hover:border-slate-300 hover:bg-slate-100/80 dark:border-slate-700 dark:bg-slate-800/40 dark:hover:border-slate-600 dark:hover:bg-slate-700/60"
                 >
-                  <div className="mb-1 flex items-center justify-between text-sm">
-                    <span className="text-slate-700 dark:text-slate-200">{p.personName}</span>
-                    <span className="font-semibold text-slate-700 dark:text-slate-200">{Math.round(p.avg)}%</span>
+                  <div className="mb-2 flex items-center justify-between gap-3 text-[11px] uppercase tracking-[0.12em] text-slate-400 dark:text-slate-500">
+                    <span>{p.personName}</span>
+                    <span className="font-semibold text-slate-600 dark:text-slate-200">{Math.round(p.avg)}%</span>
                   </div>
-                  <div
-                    className="relative h-2.5 w-full overflow-hidden rounded-full bg-slate-100 dark:bg-slate-700"
-                    title={`${p.personName}: ${Math.round(p.avg)}% (media periodo)`}
-                  >
-                    <div className={`h-full rounded-full ${color}`} style={{ width: `${fillWidth}%` }} />
-                    <div className="absolute top-0 h-full w-px bg-slate-400/60" style={{ left: `${markerPos}%` }} />
+                  <div className="relative h-3 overflow-hidden rounded-full bg-slate-200 dark:bg-slate-700">
+                    <div className="absolute inset-0 bg-gradient-to-r from-slate-200/30 to-transparent" />
+                    <div
+                      className="absolute inset-y-0 left-0 rounded-full"
+                      style={{ width: `${fillWidth}%`, background: color }}
+                      title={`${p.personName}: ${Math.round(p.avg)}% (media periodo)`}
+                    />
+                    <div className="absolute inset-y-0 w-[1px] bg-slate-500/70" style={{ left: `${underMarker}%` }} />
+                    <div className="absolute inset-y-0 w-[1px] bg-slate-700/70" style={{ left: `${overMarker}%` }} />
                   </div>
                 </Link>
               );
             })}
         </CardBody>
-        <div className="flex flex-wrap items-center gap-4 border-t border-slate-100 dark:border-slate-700 px-5 py-3 text-xs text-slate-500 dark:text-slate-400">
+        <div className="flex flex-wrap items-center gap-3 border-t border-slate-100 px-5 py-3 text-[11px] uppercase tracking-[0.08em] text-slate-500 dark:border-slate-700 dark:text-slate-400">
           <span className="flex items-center gap-1.5">
-            <span className="h-2.5 w-2.5 rounded-full bg-slate-200" />
-            0%
+            <span className="h-2.5 w-2.5 rounded-full bg-slate-400" />
+            0
           </span>
           <span className="flex items-center gap-1.5">
             <span className="h-2.5 w-2.5 rounded-full bg-amber-400" />
-            {`< ${underThreshold}% (sotto-allocato)`}
+            {`< ${underThreshold}`}
           </span>
           <span className="flex items-center gap-1.5">
             <span className="h-2.5 w-2.5 rounded-full bg-emerald-500" />
-            {`${underThreshold}–${overThreshold}%`}
+            {`${underThreshold}-${overThreshold}`}
           </span>
           <span className="flex items-center gap-1.5">
             <span className="h-2.5 w-2.5 rounded-full bg-red-500" />
-            {`> ${overThreshold}% (sovra-allocato)`}
+            {`> ${overThreshold}`}
           </span>
         </div>
       </Card>
