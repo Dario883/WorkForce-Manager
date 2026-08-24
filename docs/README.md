@@ -6,7 +6,7 @@ essere aggiornata insieme ad esso (non è un documento "una tantum").
 
 | Documento | Contenuto |
 |---|---|
-| [01-funzionale.md](01-funzionale.md) | Cos'è il sistema, chi lo usa, i moduli funzionali, i processi di business (con diagrammi di flusso e di stato) |
+| [01-funzionale.md](01-funzionale.md) | Cos'è il sistema, chi lo usa, i moduli funzionali, i processi di business e la vista dashboard executive-board a barre orizzontali con drilldown interattivo |
 | [02-architettura.md](02-architettura.md) | Vista d'insieme, layer applicativi, diagrammi UML (classi, sequenza), modello dati (ER), diagramma di deployment |
 | [03-tecnica.md](03-tecnica.md) | Stack tecnologico, struttura del repository, riferimento API, strategia di test, pipeline CI/CD |
 | [04-sicurezza.md](04-sicurezza.md) | Autenticazione, modello di autorizzazione, gestione sessioni, audit trail, gestione segreti, rischi noti |

@@ -44,11 +44,13 @@ Vista di sintesi con indicatori aggregati raggruppati in tre cluster ("Team",
 allocazione, allocazione media del team, capacità libera in ore/FTE,
 progetti attivi/in scadenza/in partenza/senza risorse, giorni di assenza nel
 periodo, richieste in attesa di approvazione. La sezione "Allocazione per
-persona" usa una visualizzazione executive-board: ogni risorsa è mostrata
-come riga sintetica con barra colorata, percentuale e conteggio di persone in
-sotto-/OK-/sovra-allocazione. Il dettaglio per persona si apre in drilldown,
-così la dashboard resta compatta e adatta a una lettura manageriale rapida
-dove l'obiettivo è identificare subito i casi critici.
+persona" usa una visualizzazione executive-board a barre orizzontali: ogni
+risorsa è mostrata come riga con nome, barra di stato colorata e percentuale
+finale; i colori distinguono sotto-/OK-/sovra-allocazione e il click sulla
+riga apre un drilldown con i progetti assegnati, la media di allocazione e
+il dettaglio del collaboratore. Questa scelta mantiene la dashboard compatta,
+facile da leggere a colpo d'occhio e adatta a un uso manageriale rapido, dove
+l'obiettivo è individuare subito i casi critici senza perdere il dettaglio.
 
 ### 3.2 Persone (`/people`, `/people/:id`)
 Anagrafica delle risorse pianificabili: nome, ruolo, email, **tipo risorsa**

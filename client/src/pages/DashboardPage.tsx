@@ -50,6 +50,17 @@ const STATUS_COLOR: Record<ProjectStatus, string> = {
   completed: "#3457d5",
 };
 
+export function getAllocationStatus(value: number, underThreshold: number, overThreshold: number) {
+  if (value < underThreshold) return "under" as const;
+  if (value > overThreshold) return "over" as const;
+  return "ok" as const;
+}
+
+export function getAllocationTone(value: number, underThreshold: number, overThreshold: number) {
+  const status = getAllocationStatus(value, underThreshold, overThreshold);
+  return status === "under" ? "#f59e0b" : status === "over" ? "#ef4444" : "#10b981";
+}
+
 export default function DashboardPage() {
   const [view, setView] = useState<PeriodView>("week");
   const [anchor, setAnchor] = useState(new Date());
@@ -530,37 +541,40 @@ export default function DashboardPage() {
             <p className="py-3 text-center text-xs text-slate-400 dark:text-slate-500">Nessun dato per il periodo selezionato</p>
           )}
 
-          <div className="space-y-1.5">
+          <div className="space-y-2">
             {[...avgPerPerson]
               .sort((a, b) => b.avg - a.avg)
               .map((p) => {
                 const pct = Math.min(Math.max(p.avg, 0), METER_MAX);
                 const fillWidth = (pct / METER_MAX) * 100;
-                const color =
-                  p.avg === 0
-                    ? "#94a3b8"
-                    : p.avg < underThreshold
-                    ? "#f59e0b"
-                    : p.avg <= overThreshold
-                    ? "#10b981"
-                    : "#ef4444";
+                const color = getAllocationTone(p.avg, underThreshold, overThreshold);
+                const status = getAllocationStatus(p.avg, underThreshold, overThreshold);
 
                 return (
                   <button
                     key={p.personId}
                     type="button"
                     onClick={() => openPersonAllocationDrilldown(p)}
-                    className="w-full rounded-md border border-slate-200 bg-slate-50/60 px-2 py-1.5 text-left transition hover:border-slate-300 hover:bg-slate-100/80 dark:border-slate-700 dark:bg-slate-800/40 dark:hover:border-slate-600 dark:hover:bg-slate-700/60"
+                    className="flex w-full items-center gap-3 rounded-md border border-slate-200 bg-slate-50/60 px-2 py-2 text-left transition hover:border-slate-300 hover:bg-slate-100/80 dark:border-slate-700 dark:bg-slate-800/40 dark:hover:border-slate-600 dark:hover:bg-slate-700/60"
                   >
-                    <div className="mb-1.5 flex items-center justify-between gap-3">
-                      <span className="truncate text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-600 dark:text-slate-200">
-                        {p.personName}
-                      </span>
-                      <span className="text-[10px] font-bold text-slate-700 dark:text-slate-100">{Math.round(p.avg)}%</span>
+                    <div className="w-36 shrink-0 text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-600 dark:text-slate-200">
+                      {p.personName}
                     </div>
-                    <div className="relative h-2.5 overflow-hidden rounded-full bg-slate-200 dark:bg-slate-700">
+                    <div className="relative h-3.5 flex-1 overflow-hidden rounded-full bg-slate-200 dark:bg-slate-700">
                       <div className="absolute inset-y-0 left-0 w-full bg-gradient-to-r from-slate-200/20 to-transparent" />
-                      <div className="absolute inset-y-0 left-0 rounded-full" style={{ width: `${fillWidth}%`, background: color }} />
+                      <div
+                        className="absolute inset-y-0 left-0 rounded-full shadow-[inset_0_0_0_1px_rgba(255,255,255,0.15)]"
+                        style={{ width: `${fillWidth}%`, background: color }}
+                      />
+                      <div className="absolute inset-y-0 left-[70%] border-l border-dashed border-slate-400/70 dark:border-slate-500" />
+                      <div className="absolute inset-y-0 left-[100%] border-l border-slate-300 dark:border-slate-600" />
+                    </div>
+                    <div className="flex w-16 items-center justify-end gap-2">
+                      <span className="text-[11px] font-bold text-slate-700 dark:text-slate-100">{Math.round(p.avg)}%</span>
+                      <span
+                        className="h-2.5 w-2.5 rounded-full"
+                        style={{ backgroundColor: color, boxShadow: status === "ok" ? "0 0 0 2px rgba(16,185,129,0.15)" : "none" }}
+                      />
                     </div>
                   </button>
                 );
