@@ -17,7 +17,7 @@ Documentazione funzionale, architetturale, tecnica e di sicurezza completa: [`do
 
 ## Funzionalità
 
-- **Dashboard**: KPI su persone, progetti attivi, sotto/sovra-allocazione
+- **Dashboard**: KPI su persone, progetti attivi, sotto/sovra-allocazione con vista executive-board a heatmap a barre per confronto immediato del carico di lavoro del team
 - **Persone**: CRUD completo + import/export CSV
 - **Progetti**: CRUD completo + import/export CSV
 - **Staffing**: assegnazione persona ↔ progetto con percentuale e periodo

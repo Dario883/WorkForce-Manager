@@ -43,9 +43,12 @@ Vista di sintesi con indicatori aggregati raggruppati in tre cluster ("Team",
 "Progetti", "Ferie"): numero di persone, persone fuori soglia di
 allocazione, allocazione media del team, capacità libera in ore/FTE,
 progetti attivi/in scadenza/in partenza/senza risorse, giorni di assenza nel
-periodo, richieste in attesa di approvazione. Include inoltre una vista
-"Allocazione per persona" con barra colorata (verde/ambra/rosso in base alle
-soglie configurate in Impostazioni).
+periodo, richieste in attesa di approvazione. La sezione "Allocazione per
+persona" è stata riformulata in stile executive board: ogni risorsa viene
+rappresentata da una barra comparativa con percentuale esplicita e soglie di
+sotto-/sovra-allocazione evidenziate come riferimenti visivi, in modo da
+rendere immediato il confronto tra i membri del team senza leggere ogni
+singolo dettaglio.
 
 ### 3.2 Persone (`/people`, `/people/:id`)
 Anagrafica delle risorse pianificabili: nome, ruolo, email, **tipo risorsa**
