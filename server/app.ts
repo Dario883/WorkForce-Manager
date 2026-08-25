@@ -15,6 +15,7 @@ import { usersRouter } from "./routes/users";
 import { absencesRouter } from "./routes/absences";
 import { holidaysRouter } from "./routes/holidays";
 import { activityRouter } from "./routes/activity";
+import { adminRouter } from "./routes/admin";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const app = express();
@@ -51,6 +52,7 @@ app.use(
   requireTabWrite("settings:holidays"),
   holidaysRouter
 );
+app.use("/api/admin", adminRouter);
 app.use("/api/activity", requireAuth, requireTab("settings"), requireTab("settings:activity"), activityRouter);
 
 if (process.env.NODE_ENV === "production") {

@@ -182,9 +182,6 @@ export default function Layout({ children }: { children: ReactNode }) {
               Svuota dati
             </button>
           )}
-          <div className="mb-1 rounded-lg border border-amber-300 bg-amber-50 px-3 py-2 text-xs font-semibold text-amber-800 dark:border-amber-700 dark:bg-amber-500/10 dark:text-amber-300">
-            BUILD TEST: admin menu active
-          </div>
           <button
             onClick={toggleTheme}
             className="mb-1 flex w-full items-center gap-3 rounded-lg px-3 py-2 text-left text-sm font-medium text-slate-600 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-700"

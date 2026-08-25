@@ -100,4 +100,43 @@ describe.skipIf(!process.env.TEST_DATABASE_URL)("/api/users", () => {
     const res = await agent.delete("/api/users/999999");
     expect(res.status).toBe(404);
   });
+
+  it("admin can clear all application data while keeping admin user accounts", async () => {
+    const agent = await adminAgent();
+
+    await agent.post("/api/people").send({ name: "Risorsa da cancellare" });
+    await agent.post("/api/projects").send({
+      name: "Progetto da cancellare",
+      commessaId: "C-DEL-001",
+      client: "Cliente",
+      status: "planned",
+      deliveryType: "T&M",
+    });
+    await agent.post("/api/absences").send({
+      personId: 1,
+      type: "ferie",
+      status: "in_attesa",
+      startDate: "2026-09-01",
+      endDate: "2026-09-05",
+    });
+
+    const reset = await agent.post("/api/admin/reset-data");
+    expect(reset.status).toBe(200);
+    expect(reset.body).toMatchObject({ deleted: expect.any(Object) });
+
+    const people = await agent.get("/api/people");
+    expect(people.status).toBe(200);
+    expect(people.body).toEqual([]);
+
+    const usersList = await agent.get("/api/users");
+    expect(usersList.status).toBe(200);
+    expect(usersList.body.some((u: { email: string }) => u.email === "admin@test.local")).toBe(true);
+  });
+
+  it("non-admin users cannot trigger the bulk reset", async () => {
+    await createTestUser({ email: "limited@test.local", name: "Limited", permissions: ["dashboard"] });
+    const agent = await loginAgent("limited@test.local");
+    const res = await agent.post("/api/admin/reset-data");
+    expect(res.status).toBe(403);
+  });
 });
