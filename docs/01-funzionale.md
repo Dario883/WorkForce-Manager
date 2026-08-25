@@ -227,6 +227,18 @@ mancanti. Per le Persone, la risposta include anche il **motivo puntuale per
 riga** (es. nome mancante, tipo non valido, capacità non valida) mostrato
 nel popup lato UI.
 
+### 4.5 Reset amministrativo dei dati
+
+Un'azione riservata all'amministratore è disponibile nel menu laterale: il
+pulsante **Svuota dati** appare solo quando l'utente corrente è l'admin del
+sistema (identificato come utente con `permissions === null`, cioè accesso
+illimitato). L'azione richiede conferma prima di eseguire il reset e cancella
+le entità applicative principali — persone, progetti, assegnazioni, assenze,
+festività, soglie e log attività — lasciando intatti gli account admin. Il
+reset è pensato per rimettere a zero il database di test/ambiente di
+valutazione senza cancellare gli utenti amministrativi necessari per
+rientrare subito nel gestionale.
+
 ## 5. Casi d'uso principali
 
 | Attore | Caso d'uso | Dove |

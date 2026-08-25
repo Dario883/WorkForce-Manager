@@ -126,6 +126,7 @@ indicato — vedi [04-sicurezza.md](04-sicurezza.md) per il dettaglio completo.
 | Assenze | `GET/POST /absences`, `PUT/DELETE /absences/:id`, `PUT /absences/:id/status`, `GET /absences/export`, `POST /absences/import` | `absences` |
 | Festività | `GET/POST /holidays`, `DELETE /holidays/:id` | `settings` + `settings:holidays` |
 | Impostazioni soglie | `GET/PUT /settings` | `settings` + `settings:thresholds` |
+| Amministrazione dati | `POST /admin/reset-data` | accesso riservato all'admin (`permissions === null`) |
 | Utenti | `GET/POST /users`, `PUT/DELETE /users/:id` | `settings` + `settings:users` (**incluse le GET**) |
 | Registro attività | `GET /activity` | `settings` + `settings:activity` (**incluse le GET**) |
 
