@@ -13,5 +13,11 @@ export default defineConfig({
     setupFiles: ["./tests/setupEnv.ts"],
     include: ["tests/unit/**/*.test.ts", "tests/integration/**/*.test.ts"],
     fileParallelism: false,
+    coverage: {
+      provider: "v8",
+      reporter: ["text", "lcov"],
+      reportsDirectory: "coverage",
+      include: ["server/**", "client/src/**", "shared/**"],
+    },
   },
 });
