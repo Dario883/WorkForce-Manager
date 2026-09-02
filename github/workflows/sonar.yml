@@ -1,0 +1,17 @@
+name: SonarQube Analysis
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '0 3 * * *'   # opzionale: ogni notte alle 3 UTC, togli se non ti serve
+
+jobs:
+  sonar:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: SonarSource/sonarqube-scan-action@v4
+        env:
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+          SONAR_HOST_URL: ${{ secrets.SONAR_HOST_URL }}
