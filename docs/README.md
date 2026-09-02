@@ -28,8 +28,8 @@ degli editor Markdown (incluso VS Code con l'estensione Markdown Preview Mermaid
 
 ## Stato del progetto (riferimento rapido)
 
-- **Repository**: `Dario883/WorkForce-Manager` (fork di deploy)
+- **Repository**: `speed78/WorkForce-Manager`
 - **Ambiente di produzione**: Azure App Service + Azure Database for PostgreSQL Flexible Server
-- **CI/CD**: GitHub Actions — job `test` (typecheck + unit + integration + e2e) blocca il job `build-and-deploy`
+- **CI/CD**: due workflow GitHub Actions indipendenti — `deploy.yml` (job `test` con typecheck + unit + integration + e2e, blocca `build-and-deploy`) e `sonar.yml` (analisi SonarQube, esegue `npm run test:coverage` prima della scan)
 - **Funzionalità admin**: il menu laterale espone un pulsante riservato all’admin per svuotare tutti i dati applicativi, lasciando intatti gli account amministrativi
-- **Ultimo aggiornamento di questa documentazione**: 2026-08-25
+- **Ultimo aggiornamento di questa documentazione**: 2026-09-02

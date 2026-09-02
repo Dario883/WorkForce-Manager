@@ -52,9 +52,15 @@ flowchart TB
 
 Ogni layer ha una responsabilità unica e non salta livelli: i componenti
 React non parlano mai direttamente al database, i router Express non
-generano mai HTML, l'accesso ai dati passa sempre da Drizzle (mai SQL grezzo
-sparso nei router, salvo il singolo `TRUNCATE` usato solo nell'harness dei
-test — vedi [03-tecnica.md](03-tecnica.md#5-testing)).
+generano mai HTML, l'accesso ai dati passa quasi sempre da Drizzle. Le due
+sole eccezioni con SQL grezzo (`pool.query`) sono entrambe un `TRUNCATE`:
+quello usato nell'harness dei test (`tests/integration/helpers.ts`, vedi
+[03-tecnica.md](03-tecnica.md#5-testing)) e quello dietro l'endpoint
+amministrativo `POST /api/admin/reset-data`
+(`server/routes/admin.ts`) — quest'ultimo è codice applicativo di
+produzione, non solo di test, e tronca tutte le tabelle dati in un unico
+statement (necessario per evitare deadlock da lock `CASCADE` su tabelle in
+comune se eseguito come query separate in parallelo).
 
 ## 3. Catena middleware (Express)
 
@@ -372,7 +378,7 @@ flowchart TB
     end
 
     subgraph GitHub
-        Repo["Repository Git<br/>Dario883/WorkForce-Manager"]
+        Repo["Repository Git<br/>speed78/WorkForce-Manager"]
         TestJob["Job 'test'<br/>typecheck + unit + integration + e2e<br/>(Postgres effimero via service container)"]
         DeployJob["Job 'build-and-deploy'<br/>(needs: test)"]
     end
@@ -395,6 +401,13 @@ Il job `test` della pipeline usa un **Postgres effimero** (container di
 servizio di GitHub Actions), non il database di produzione: build e deploy
 procedono solo se l'intera suite passa contro quel database usa-e-getta.
 Dettagli in [03-tecnica.md §CI/CD](03-tecnica.md#6-cicd).
+
+Il diagramma sopra mostra solo la pipeline di deploy (`deploy.yml`). Un
+secondo workflow indipendente, `sonar.yml`, esegue l'analisi SonarQube
+(anch'esso con un Postgres effimero, per far girare i test di integrazione
+e produrre la coverage) ma non fa parte della catena che porta al deploy:
+non blocca né viene bloccato da `build-and-deploy`. Dettagli in
+[03-tecnica.md §CI/CD](03-tecnica.md#6-cicd).
 
 ## 8. Decisioni architetturali chiave
 

@@ -34,11 +34,17 @@
 | Tecnologia | Versione | Ruolo |
 |---|---|---|
 | Vitest | 4.1.10 | Unit e integration test |
+| @vitest/coverage-v8 | 4.1.10 | Coverage (provider v8), report `lcov` consumato da SonarQube |
 | Supertest | 7.2.2 | Richieste HTTP contro l'app Express nei test di integrazione |
 | Playwright (`@playwright/test`) | 1.62.x | Test end-to-end su browser reale (Chromium) |
 
 ### CI/CD e hosting
-- **GitHub Actions** — pipeline `test` → `build-and-deploy`
+- **GitHub Actions** — due workflow indipendenti: `deploy.yml` (job `test` →
+  `build-and-deploy`) e `sonar.yml` (analisi SonarQube, non collegato al
+  deploy)
+- **SonarQube** — analisi statica + coverage, eseguita manualmente
+  (`workflow_dispatch`) o ogni notte (schedule); quality gate configurato sul
+  progetto lato SonarQube
 - **Azure App Service** (Linux, piano `B1`) — hosting dell'applicazione
 - **Azure Database for PostgreSQL Flexible Server** — database di produzione
 
@@ -82,7 +88,10 @@ tests/
 
 e2e/                     → specifiche Playwright + globalSetup dedicato
 
-.github/workflows/deploy.yml → pipeline CI/CD
+.github/workflows/
+  deploy.yml              → pipeline CI/CD (test → build-and-deploy su Azure)
+  sonar.yml                → analisi SonarQube (npm run test:coverage + scan)
+sonar-project.properties → configurazione progetto SonarQube (sources, esclusioni, report coverage)
 setup-deploy.ps1              → script di provisioning iniziale delle risorse Azure
 ```
 
@@ -163,16 +172,20 @@ flowchart TB
 
 Comandi:
 ```bash
-npm test          # unit + integration (Vitest)
-npm run test:e2e  # end-to-end (Playwright)
-npm run check     # type-check (tsc --noEmit)
+npm test              # unit + integration (Vitest)
+npm run test:coverage # come sopra, con report coverage lcov in coverage/ (usato da Sonar)
+npm run test:e2e      # end-to-end (Playwright)
+npm run check         # type-check (tsc --noEmit)
 ```
 
 Setup di un database di test locale: vedi [README §5](../README.md).
 
 ## 6. CI/CD
 
-`.github/workflows/deploy.yml`, due job in sequenza:
+Due workflow GitHub Actions indipendenti, nessuno dei due dipende
+dall'altro.
+
+### `deploy.yml` — due job in sequenza
 
 1. **`test`** (gira su ogni push su `main`): container di servizio
    PostgreSQL effimero, `npm ci`, `npx playwright install --with-deps
@@ -187,6 +200,25 @@ Le migrazioni del database di **produzione** non fanno parte della pipeline
 automatica: si applicano manualmente con `npm run db:migrate` puntando a
 `DATABASE_URL` di produzione (scelta deliberata, per non eseguire mai una
 migrazione distruttiva senza supervisione umana).
+
+### `sonar.yml` — analisi SonarQube
+
+Un solo job `sonar`, eseguito manualmente (`workflow_dispatch`) o ogni notte
+alle 3 UTC (`schedule`), **non** su ogni push. Passi: container di servizio
+PostgreSQL effimero (stesso schema del job `test` di `deploy.yml`), `npm
+ci`, `npm run test:coverage` (unit + integration test con report di
+coverage `lcov` in `coverage/`), poi `SonarSource/sonarqube-scan-action@v4`
+(`SONAR_TOKEN`/`SONAR_HOST_URL` da secret del repository). La
+configurazione dell'analisi è in `sonar-project.properties`: `sources`
+copre `server`, `client/src`, `shared`; `client/src` è escluso dal solo
+**calcolo della coverage** (`sonar.coverage.exclusions`, non
+dall'analisi) perché non ha test unitari — solo test e2e Playwright, che
+non producono un report di coverage consumabile da Sonar.
+
+Questo job non fa parte della catena di deploy: un fallimento della scan
+Sonar (o del quality gate) non blocca `deploy.yml`, ed è indipendente dal
+job `test` di quel workflow (i due job avviano ciascuno il proprio Postgres
+effimero e i propri test, senza condividerli).
 
 ## 7. Convenzioni di sviluppo
 

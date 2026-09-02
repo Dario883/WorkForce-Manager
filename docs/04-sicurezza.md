@@ -69,6 +69,7 @@ protetti):
 | `/api/users` | `requireAuth`, `requireTab("settings")`, `requireTab("settings:users")` | **tutto** (incluse le GET) richiede entrambi |
 | `/api/absences` | `requireAuth`, `requireTabWrite("absences")` | lettura libera, scrittura richiede `absences` |
 | `/api/activity` | `requireAuth`, `requireTab("settings")`, `requireTab("settings:activity")` | **tutto** richiede entrambi |
+| `/api/admin` | `requireAuth`, più un controllo **inline** nell'handler (`req.user?.permissions !== null`) | l'unico router protetto non da `requireTab`/`requireTabWrite` ma da un controllo ad-hoc: richiede che l'utente sia admin (`permissions === null`, accesso completo), non un permesso specifico su una sezione. `POST /admin/reset-data` tronca tutte le tabelle dati applicative (vedi [01-funzionale.md §4.5](01-funzionale.md#45-reset-amministrativo-dei-dati)) |
 
 ### Protezioni anti-blocco (self-lockout)
 
@@ -148,10 +149,17 @@ hardening ulteriore:
 - **Nessuna notifica automatica** su approvazione/rifiuto assenze o
   variazioni di allocazione — un utente scopre l'esito solo accedendo
   all'applicazione.
-- **Dipendenze con vulnerabilità note (basso rischio, solo devDependencies)**:
-  `npm audit` segnala alcune vulnerabilità moderate/alte in pacchetti di
-  sviluppo (build/test tooling), non nel bundle di produzione servito agli
-  utenti; da rivalutare periodicamente con `npm audit`.
+- **Dipendenza di produzione con vulnerabilità nota (`drizzle-orm`)**:
+  `npm audit --omit=dev` (verificato il 2026-09-02) segnala una vulnerabilità
+  **high** in `drizzle-orm@0.31.4` (SQL injection via identificatori SQL
+  non correttamente escaped, [GHSA-gpj5-g38j-94v9](https://github.com/advisories/GHSA-gpj5-g38j-94v9)),
+  risolta in `drizzle-orm@0.45.2`. È rilevante perché Drizzle è proprio la
+  mitigazione indicata in questa stessa tabella per il rischio SQL injection
+  (§5) — va rivalutato l'aggiornamento (0.31.x → 0.45.x è un salto di major
+  minor con possibili breaking change, non ancora pianificato). Oltre a
+  questa, `npm audit` segnala ulteriori vulnerabilità moderate/alte ma solo
+  in devDependencies (build/test tooling), non presenti nel bundle servito
+  agli utenti; da rivalutare periodicamente con `npm audit`.
 - **Log applicativi**: gli errori non gestiti finiscono su `console.error`
   (stdout/stderr del processo Node) — non c'è oggi un sistema centralizzato
   di log/alerting (es. Application Insights) collegato all'App Service.
