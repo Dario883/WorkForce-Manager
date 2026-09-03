@@ -25,9 +25,7 @@ adminRouter.post(
       return res.status(403).json({ error: "Solo l'admin può svuotare tutti i dati applicativi" });
     }
 
-    await Promise.all(
-      DATA_TABLES.map((table) => pool.query(`TRUNCATE TABLE ${table} RESTART IDENTITY CASCADE`))
-    );
+    await pool.query(`TRUNCATE TABLE ${DATA_TABLES.join(", ")} RESTART IDENTITY CASCADE`);
 
     res.json({
       ok: true,
