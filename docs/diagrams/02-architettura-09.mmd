@@ -1,0 +1,26 @@
+﻿sequenceDiagram
+    actor U as Utente
+    participant SPA as React SPA
+    participant API as Express (/api/auth)
+    participant DB as PostgreSQL
+
+    U->>SPA: inserisce email + password
+    SPA->>API: POST /api/auth/login
+    API->>DB: SELECT user WHERE email
+    DB-->>API: riga utente (password_hash)
+    API->>API: bcrypt.compare(password, hash)
+    alt credenziali valide
+        API->>API: jwt.sign({userId, email, name})
+        API-->>SPA: 200 + Set-Cookie httpOnly (7 giorni)
+    else credenziali non valide
+        API-->>SPA: 401 Credenziali non valide
+    end
+
+    Note over SPA,API: Ad ogni richiesta successiva...
+    SPA->>API: GET /api/people (cookie incluso)
+    API->>API: verifica firma JWT
+    API->>DB: SELECT active, permissions WHERE id = userId
+    DB-->>API: active=true, permissions=[...]
+    API->>API: requireAuth â†’ requireTabWrite("people")
+    API-->>SPA: 200 dati
+

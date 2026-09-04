@@ -17,6 +17,7 @@ const absenceSchema = z.object({
   type: z.enum(ABSENCE_TYPES).default("ferie"),
   startDate: z.string(),
   endDate: z.string(),
+  hours: z.number().positive().max(24).optional().nullable(),
   notes: z.string().optional().nullable(),
 });
 
@@ -32,6 +33,7 @@ const SELECT_COLUMNS = {
   status: absences.status,
   startDate: absences.startDate,
   endDate: absences.endDate,
+  hours: absences.hours,
   notes: absences.notes,
   createdAt: absences.createdAt,
   updatedAt: absences.updatedAt,
@@ -48,8 +50,8 @@ absencesRouter.get("/", asyncHandler(async (_req, res) => {
 
 absencesRouter.get("/csv-template", (_req, res) => {
   const csv = Papa.unparse({
-    fields: ["personName", "type", "startDate", "endDate", "notes"],
-    data: [["Mario Rossi", "ferie", "2026-08-10", "2026-08-14", ""]],
+    fields: ["personName", "type", "startDate", "endDate", "hours", "notes"],
+    data: [["Mario Rossi", "ferie", "2026-08-10", "2026-08-14", "", ""]],
   });
   res.header("Content-Type", "text/csv");
   res.attachment("absences-template.csv");
@@ -69,6 +71,7 @@ absencesRouter.get("/export", asyncHandler(async (_req, res) => {
       status: a.status,
       startDate: a.startDate,
       endDate: a.endDate,
+      hours: a.hours ?? "",
       notes: a.notes ?? "",
     }))
   );
@@ -110,7 +113,9 @@ absencesRouter.post("/import", asyncHandler(async (req, res) => {
     const personName = row.personName?.trim();
     const startDate = parseDate(row.startDate);
     const endDate = parseDate(row.endDate);
-    if (!personName || !startDate || !endDate || endDate < startDate) {
+    const hoursRaw = row.hours?.trim();
+    const hours = hoursRaw ? Number(hoursRaw) : null;
+    if (!personName || !startDate || !endDate || endDate < startDate || (hours !== null && (!Number.isFinite(hours) || hours <= 0 || hours > 24))) {
       skipped++;
       continue;
     }
@@ -124,6 +129,7 @@ absencesRouter.post("/import", asyncHandler(async (req, res) => {
       type: parseType(row.type) as any,
       startDate,
       endDate,
+      hours,
       notes: row.notes?.trim() || null,
     });
     imported++;
@@ -162,6 +168,9 @@ absencesRouter.post("/", asyncHandler(async (req, res) => {
   if (parsed.data.endDate < parsed.data.startDate) {
     return res.status(400).json({ error: "La data di fine non può precedere la data di inizio" });
   }
+  if (parsed.data.hours !== null && parsed.data.hours !== undefined && parsed.data.startDate !== parsed.data.endDate) {
+    return res.status(400).json({ error: "Le assenze espresse in ore devono riferirsi a una sola giornata" });
+  }
   const [created] = await db.insert(absences).values(parsed.data).returning();
   await logActivity(req.user!, "created", "assenza", created.id, await personName(created.personId));
   res.status(201).json(created);
@@ -171,12 +180,19 @@ absencesRouter.put("/:id", asyncHandler(async (req, res) => {
   const id = Number(req.params.id);
   const parsed = absenceSchema.partial().safeParse(req.body);
   if (!parsed.success) return res.status(400).json({ error: parsed.error.flatten() });
+  const [existing] = await db.select().from(absences).where(eq(absences.id, id)).limit(1);
+  if (!existing) return res.status(404).json({ error: "Assenza non trovata" });
+  const nextStart = parsed.data.startDate ?? existing.startDate;
+  const nextEnd = parsed.data.endDate ?? existing.endDate;
+  const nextHours = parsed.data.hours === undefined ? existing.hours : parsed.data.hours;
+  if (nextEnd < nextStart || (nextHours !== null && nextHours !== undefined && nextStart !== nextEnd)) {
+    return res.status(400).json({ error: "Le assenze espresse in ore devono riferirsi a una sola giornata" });
+  }
   const [updated] = await db
     .update(absences)
     .set({ ...parsed.data, updatedAt: new Date() })
     .where(eq(absences.id, id))
     .returning();
-  if (!updated) return res.status(404).json({ error: "Assenza non trovata" });
   await logActivity(req.user!, "updated", "assenza", updated.id, await personName(updated.personId));
   res.json(updated);
 }));

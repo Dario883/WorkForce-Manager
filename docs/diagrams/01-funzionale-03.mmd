@@ -1,0 +1,12 @@
+﻿flowchart TD
+    A[Admin apre Impostazioni â†’ Utenti] --> B[Crea nuovo utente<br/>nome, email, password]
+    B --> C["Permessi = null<br/>(accesso completo di default)"]
+    C --> D{Serve limitare<br/>l'accesso?}
+    D -->|No| Z[Fine]
+    D -->|SÃ¬| E[Click 'Personalizza']
+    E --> F[Seleziona le sezioni<br/>concesse tra le 8 disponibili]
+    F --> G{Tra le sezioni c'Ã¨<br/>'Impostazioni'?}
+    G -->|SÃ¬| H[Seleziona anche le<br/>sotto-sezioni: Soglie,<br/>FestivitÃ , Utenti, Registro]
+    G -->|No| Z
+    H --> Z
+

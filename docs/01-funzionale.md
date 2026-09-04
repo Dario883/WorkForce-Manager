@@ -100,7 +100,9 @@ Vista a griglia persona × periodo (settimana/mese/anno), con due modalità:
 Elenco assenze con filtri (persona, tipo, stato, anno), riepilogo giorni per
 persona nell'anno selezionato (esclude le assenze rifiutate), workflow di
 approvazione (approva/rifiuta, anche in blocco su selezione multipla),
-import/export CSV.
+import/export CSV. Un'assenza può essere a giornate intere oppure espressa in
+ore su una singola giornata; un'assenza approvata viene riportata nel
+Calendario e blocca il censimento staffing della giornata.
 
 ### 3.8 Impostazioni (`/settings`)
 Quattro sotto-sezioni, ciascuna con un proprio permesso indipendente (vedi
@@ -126,7 +128,9 @@ si **sommano** (una persona può essere staffata al 60% su un progetto e al
 
 In fase di inserimento da UI, prima del salvataggio il sistema chiede
 conferma all'utente se la nuova riga comporta **sovra-allocazione >100%**
-nel periodo o se il progetto è in stato diverso da `active`.
+nel periodo o se il progetto è in stato diverso da `active`. Il server rifiuta
+inoltre qualsiasi inserimento, modifica, split o overwrite che tocchi una
+festività configurata o un'assenza approvata, anche via API.
 
 Due operazioni meritano attenzione perché contengono la logica di dominio
 più delicata del sistema:

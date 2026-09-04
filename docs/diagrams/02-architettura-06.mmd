@@ -1,0 +1,11 @@
+﻿flowchart LR
+    R[Richiesta HTTP] --> M1["express.json()"]
+    M1 --> M2["cookieParser()"]
+    M2 --> M3["attachUser<br/>(decodifica JWT, ri-verifica<br/>active + permissions da DB<br/>ad OGNI richiesta)"]
+    M3 --> M4{"requireAuth<br/>req.user presente?"}
+    M4 -->|No| E401["401 Non autenticato"]
+    M4 -->|SÃ¬| M5{"requireTab / requireTabWrite<br/>permesso sulla sezione?"}
+    M5 -->|No| E403["403 Non hai i permessi..."]
+    M5 -->|SÃ¬| RT["Router della risorsa<br/>(validazione zod + logica)"]
+    RT --> RES["Risposta JSON"]
+

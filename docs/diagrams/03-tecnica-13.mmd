@@ -1,0 +1,7 @@
+﻿flowchart TB
+    E2E["e2e/ â€” Playwright (5 specifiche)<br/>browser reale, build di produzione,<br/>database dedicato"]
+    INT["tests/integration/ â€” Vitest + Supertest (~60 test)<br/>app Express reale, database Postgres<br/>dedicato e usa-e-getta"]
+    UNIT["tests/unit/ â€” Vitest (~35 test)<br/>funzioni pure, nessun database"]
+
+    UNIT --> INT --> E2E
+

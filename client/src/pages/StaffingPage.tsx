@@ -1,5 +1,6 @@
 import { Fragment, useEffect, useRef, useState } from "react";
 import { Link } from "wouter";
+import { addMonths, addWeeks, addYears, endOfMonth, endOfWeek, endOfYear, format, startOfMonth, startOfWeek, startOfYear } from "date-fns";
 import { api, ApiError } from "../lib/api";
 import type { Assignment, Person, Project } from "@shared/types";
 import { Card, CardBody } from "../components/Card";
@@ -10,6 +11,7 @@ import { compareValues, useSortable } from "../lib/sort";
 
 type SortKey = "personName" | "projectName" | "percentage" | "startDate";
 type ViewMode = "list" | "person";
+type PeriodMode = "week" | "month" | "year";
 
 export default function StaffingPage() {
   const [assignments, setAssignments] = useState<Assignment[]>([]);
@@ -22,6 +24,8 @@ export default function StaffingPage() {
   const [personFilter, setPersonFilter] = useState<number | "">("");
   const [projectFilter, setProjectFilter] = useState<number | "">("");
   const [activeOn, setActiveOn] = useState("");
+  const [periodMode, setPeriodMode] = useState<PeriodMode | "">("");
+  const [periodAnchor, setPeriodAnchor] = useState(new Date());
   const [viewMode, setViewMode] = useState<ViewMode>("list");
   const [collapsed, setCollapsed] = useState<Record<number, boolean>>({});
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -33,6 +37,16 @@ export default function StaffingPage() {
     if (personFilter !== "" && a.personId !== personFilter) return false;
     if (projectFilter !== "" && a.projectId !== projectFilter) return false;
     if (activeOn && (a.startDate > activeOn || a.endDate < activeOn)) return false;
+    if (periodMode) {
+      const period = periodMode === "week"
+        ? { start: startOfWeek(periodAnchor, { weekStartsOn: 1 }), end: endOfWeek(periodAnchor, { weekStartsOn: 1 }) }
+        : periodMode === "month"
+        ? { start: startOfMonth(periodAnchor), end: endOfMonth(periodAnchor) }
+        : { start: startOfYear(periodAnchor), end: endOfYear(periodAnchor) };
+      const from = format(period.start, "yyyy-MM-dd");
+      const to = format(period.end, "yyyy-MM-dd");
+      if (a.startDate > to || a.endDate < from) return false;
+    }
     return true;
   });
 
@@ -66,6 +80,10 @@ export default function StaffingPage() {
 
   function togglePerson(personId: number) {
     setCollapsed((prev) => ({ ...prev, [personId]: !prev[personId] }));
+  }
+
+  function shiftPeriod(direction: 1 | -1) {
+    setPeriodAnchor((date) => periodMode === "week" ? addWeeks(date, direction) : periodMode === "month" ? addMonths(date, direction) : addYears(date, direction));
   }
 
   function load() {
@@ -167,6 +185,23 @@ export default function StaffingPage() {
           ))}
         </Select>
         <Input type="date" value={activeOn} onChange={(e) => setActiveOn(e.target.value)} title="Attive in questa data" />
+      </div>
+
+      <div className="mb-4 flex flex-wrap items-center gap-2">
+        <div className="flex rounded-lg border border-slate-200 bg-white p-0.5 dark:border-slate-600 dark:bg-slate-800">
+          {(["", "week", "month", "year"] as const).map((mode) => (
+            <button key={mode || "all"} onClick={() => setPeriodMode(mode)} className={`rounded-md px-3 py-1.5 text-sm font-medium ${periodMode === mode ? "bg-brand-500 text-white" : "text-slate-600 dark:text-slate-300"}`}>
+              {mode === "" ? "Tutto" : mode === "week" ? "Settimana" : mode === "month" ? "Mese" : "Anno"}
+            </button>
+          ))}
+        </div>
+        {periodMode && <>
+          <Button variant="secondary" onClick={() => shiftPeriod(-1)}>←</Button>
+          <span className="text-sm text-slate-600 dark:text-slate-300">
+            {periodMode === "week" ? `${format(startOfWeek(periodAnchor, { weekStartsOn: 1 }), "dd/MM/yyyy")} – ${format(endOfWeek(periodAnchor, { weekStartsOn: 1 }), "dd/MM/yyyy")}` : periodMode === "month" ? format(periodAnchor, "MMMM yyyy") : format(periodAnchor, "yyyy")}
+          </span>
+          <Button variant="secondary" onClick={() => shiftPeriod(1)}>→</Button>
+        </>}
       </div>
 
       <div className="mb-4 flex justify-end">

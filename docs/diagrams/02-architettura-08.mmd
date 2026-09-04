@@ -1,0 +1,74 @@
+﻿classDiagram
+    class User {
+        +int id
+        +string email
+        +string name
+        +boolean active
+        +string[] permissions
+        +hasAccess(tab) boolean
+    }
+
+    class Person {
+        +int id
+        +string name
+        +string role
+        +number capacityHoursPerWeek
+        +int managerId
+        +boolean isApprover
+        +resolveCapacity(date) number
+    }
+
+    class Project {
+        +int id
+        +string commessaId
+        +string name
+        +ProjectStatus status
+        +DeliveryType deliveryType
+        +int pmId
+    }
+
+    class Assignment {
+        +int id
+        +int personId
+        +int projectId
+        +number percentage
+        +Date startDate
+        +Date endDate
+        +overwrite(newRange) Assignment[]
+        +splitAt(date, unit, percentage) Assignment[]
+    }
+
+    class Absence {
+        +int id
+        +int personId
+        +AbsenceType type
+        +AbsenceStatus status
+        +Date startDate
+        +Date endDate
+        +approve()
+        +reject()
+    }
+
+    class CapacityPeriod {
+        +int id
+        +int personId
+        +Date startDate
+        +Date endDate
+        +number hoursPerWeek
+    }
+
+    class ActivityLogEntry {
+        +int userId
+        +string action
+        +string entityType
+        +string entityName
+        +Date createdAt
+    }
+
+    Person "1" --> "0..*" Assignment : ha
+    Project "1" --> "0..*" Assignment : riceve
+    Person "1" --> "0..*" Absence : richiede
+    Person "1" --> "0..*" CapacityPeriod : ha override di
+    Person "0..1" --> "0..*" Person : Ã¨ responsabile di
+    Person "0..1" --> "0..*" Project : Ã¨ PM di
+

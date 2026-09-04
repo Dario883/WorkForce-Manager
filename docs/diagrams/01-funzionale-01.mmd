@@ -1,0 +1,16 @@
+﻿flowchart TD
+    A[Nuova assegnazione: persona, progetto, %, periodo] --> B{Esiste una riga esistente<br/>che si sovrappone?}
+    B -->|No| F[Inserisci nuova riga]
+    B -->|SÃ¬| C{Il nuovo periodo<br/>copre interamente<br/>quello esistente?}
+    C -->|SÃ¬| D[Elimina la riga esistente]
+    C -->|No| E{Il nuovo periodo Ã¨<br/>interamente contenuto<br/>in quello esistente?}
+    E -->|SÃ¬| G["Divide la riga esistente in due:<br/>parte prima + parte dopo<br/>(percentuale originale)"]
+    E -->|No| H{Si sovrappone solo<br/>all'inizio o solo alla fine?}
+    H -->|Inizio| I["Tronca la riga esistente:<br/>nuova data fine = giorno prima<br/>del nuovo inizio"]
+    H -->|Fine| J["Tronca la riga esistente:<br/>nuova data inizio = giorno dopo<br/>la nuova fine"]
+    D --> F
+    G --> F
+    I --> F
+    J --> F
+    F --> K[Registra nel log attivitÃ ]
+

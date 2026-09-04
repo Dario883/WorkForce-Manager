@@ -141,6 +141,7 @@ erDiagram
         enum status "in_attesa/approvata/rifiutata"
         date start_date
         date end_date
+        real hours "null = giornate intere; valorizzato = assenza oraria su un giorno"
         text notes
     }
 

@@ -1,0 +1,24 @@
+﻿flowchart TB
+    subgraph Dev["Sviluppo locale"]
+        DevMachine["npm run dev:server (:3000)<br/>npm run dev:client (:5173, proxy /api)"]
+    end
+
+    subgraph GitHub
+        Repo["Repository Git<br/>Dario883/WorkForce-Manager"]
+        TestJob["Job 'test'<br/>typecheck + unit + integration + e2e<br/>(Postgres effimero via service container)"]
+        DeployJob["Job 'build-and-deploy'<br/>(needs: test)"]
+    end
+
+    subgraph Azure["Azure (region: West Europe / fallback regionale)"]
+        Plan["App Service Plan<br/>Linux, SKU B1"]
+        WebApp["Azure App Service<br/>Node.js, porta assegnata da Azure"]
+        PG["Azure Database for PostgreSQL<br/>Flexible Server, Burstable Standard_B1ms"]
+    end
+
+    DevMachine -- git push --> Repo
+    Repo -- "push su main" --> TestJob
+    TestJob -- "solo se tutti i test passano" --> DeployJob
+    DeployJob -- "npm run build + deploy" --> WebApp
+    Plan -. ospita .-> WebApp
+    WebApp <-- "TLS, sslmode=require" --> PG
+

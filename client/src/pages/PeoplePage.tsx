@@ -29,6 +29,8 @@ export default function PeoplePage() {
   const [roleFilter, setRoleFilter] = useState("");
   const [typeFilter, setTypeFilter] = useState<PersonType | "">("");
   const [approverFilter, setApproverFilter] = useState<"all" | "yes" | "no">("all");
+  const [selected, setSelected] = useState<Set<number>>(new Set());
+  const [bulkDeleting, setBulkDeleting] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const { sortKey, sortDir, onSort } = useSortable<SortKey>("name");
 
@@ -95,6 +97,34 @@ export default function PeoplePage() {
     load();
   }
 
+  function toggleSelected(id: number) {
+    setSelected((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }
+
+  function toggleSelectAll() {
+    setSelected((prev) => (prev.size === filteredPeople.length ? new Set() : new Set(filteredPeople.map((p) => p.id))));
+  }
+
+  async function handleBulkDelete() {
+    if (!selected.size) return;
+    if (!confirm(`Eliminare ${selected.size} persone? Verranno eliminate anche assegnazioni, assenze e capacità collegate.`)) return;
+    setBulkDeleting(true);
+    try {
+      await api.post("/people/bulk-delete", { ids: [...selected] });
+      setSelected(new Set());
+      load();
+    } catch (err) {
+      alert(err instanceof ApiError ? err.message : "Errore durante l'eliminazione multipla.");
+    } finally {
+      setBulkDeleting(false);
+    }
+  }
+
   async function handleImport(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -157,6 +187,15 @@ export default function PeoplePage() {
         </div>
       </div>
 
+      {selected.size > 0 && (
+        <div className="mb-3 flex items-center justify-between rounded-lg bg-brand-50 px-4 py-2.5 text-sm dark:bg-brand-500/10">
+          <span className="text-brand-700 dark:text-brand-400">{selected.size} selezionate</span>
+          <button className="font-medium text-red-600 hover:underline disabled:opacity-50" disabled={bulkDeleting} onClick={handleBulkDelete}>
+            {bulkDeleting ? "Eliminazione…" : "Elimina selezionate"}
+          </button>
+        </div>
+      )}
+
       <div className="mb-4 flex flex-col gap-3 sm:flex-row">
         <div className="flex-1">
           <Input
@@ -201,6 +240,9 @@ export default function PeoplePage() {
             <table className="w-full text-sm">
               <thead className="border-b border-slate-100 dark:border-slate-700 text-left text-xs uppercase text-slate-500 dark:text-slate-400">
                 <tr>
+                  <th className="w-10 px-5 py-3">
+                    <input type="checkbox" checked={filteredPeople.length > 0 && selected.size === filteredPeople.length} onChange={toggleSelectAll} />
+                  </th>
                   <SortableTh label="Nome" sortKey="name" currentKey={sortKey} currentDir={sortDir} onSort={onSort} />
                   <SortableTh label="Ruolo" sortKey="role" currentKey={sortKey} currentDir={sortDir} onSort={onSort} />
                   <th className="px-5 py-3">Tipo</th>
@@ -225,6 +267,7 @@ export default function PeoplePage() {
               <tbody className="divide-y divide-slate-100 dark:divide-slate-700">
                 {sortedPeople.map((p) => (
                   <tr key={p.id} className="hover:bg-slate-50 dark:hover:bg-slate-700">
+                    <td className="px-5 py-3"><input type="checkbox" checked={selected.has(p.id)} onChange={() => toggleSelected(p.id)} /></td>
                     <td className="px-5 py-3">
                       <Link href={`/people/${p.id}`} className="flex items-center gap-2 font-medium text-slate-800 dark:text-slate-100 hover:text-brand-600 dark:hover:text-brand-400">
                         <span

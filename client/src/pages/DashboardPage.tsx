@@ -210,6 +210,30 @@ export default function DashboardPage() {
     }))
     .sort((a, b) => b.hours - a.hours);
 
+  const projectAverageMap = new Map<string, { color: string; total: number; samples: number; hours: number }>();
+  for (const person of avgPerPerson) {
+    for (const day of Object.values(person.days)) {
+      for (const item of day.items) {
+        const entry = projectAverageMap.get(item.projectName) ?? { color: item.projectColor, total: 0, samples: 0, hours: 0 };
+        entry.total += item.percentage;
+        entry.samples += 1;
+        entry.hours += (person.capacityHoursPerWeek / 5) * (item.percentage / 100);
+        projectAverageMap.set(item.projectName, entry);
+      }
+    }
+  }
+  const projectAverages = projects
+    .map((project) => {
+      const value = projectAverageMap.get(project.name);
+      return {
+        ...project,
+        average: value ? value.total / value.samples : 0,
+        hours: value?.hours ?? 0,
+      };
+    })
+    .filter((project) => project.average > 0 || periodAssignments.some((assignment) => assignment.projectId === project.id))
+    .sort((a, b) => b.average - a.average);
+
   const deliveryTypeCounts = DELIVERY_ORDER.map((type) => ({
     type,
     count: projects.filter((p) => p.deliveryType === type).length,
@@ -637,6 +661,26 @@ export default function DashboardPage() {
               onSliceClick={openUtilizationDrilldown}
               valueFormat={(v) => `${v}h`}
             />
+          </CardBody>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <h2 className="font-semibold text-slate-800 dark:text-slate-100">Media allocazione per progetto</h2>
+            <p className="text-xs text-slate-500 dark:text-slate-400">Percentuale media e ore nel periodo</p>
+          </CardHeader>
+          <CardBody className="space-y-2">
+            {projectAverages.length === 0 ? (
+              <p className="py-3 text-center text-xs text-slate-400 dark:text-slate-500">Nessun progetto allocato nel periodo</p>
+            ) : projectAverages.map((project) => (
+              <button key={project.id} type="button" onClick={() => openUtilizationDrilldown(project.name)} className="flex w-full items-center justify-between rounded-md px-2 py-1.5 text-left hover:bg-slate-50 dark:hover:bg-slate-700/50">
+                <span className="flex min-w-0 items-center gap-2 truncate text-sm text-slate-700 dark:text-slate-200">
+                  <span className="h-2.5 w-2.5 shrink-0 rounded-full" style={{ backgroundColor: project.color }} />
+                  {project.name}
+                </span>
+                <span className="shrink-0 text-xs font-semibold text-slate-600 dark:text-slate-300">{Math.round(project.average)}% · {Math.round(project.hours * 10) / 10}h</span>
+              </button>
+            ))}
           </CardBody>
         </Card>
       </div>

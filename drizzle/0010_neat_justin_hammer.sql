@@ -1,0 +1,1 @@
+ALTER TABLE "absences" ADD COLUMN "hours" real;

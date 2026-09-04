@@ -126,6 +126,7 @@ export const absences = pgTable("absences", {
   status: absenceStatusEnum("status").default("in_attesa").notNull(),
   startDate: date("start_date").notNull(),
   endDate: date("end_date").notNull(),
+  hours: real("hours"),
   notes: text("notes"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),

@@ -4,7 +4,7 @@ import Papa from "papaparse";
 import { alias } from "drizzle-orm/pg-core";
 import { db } from "../db";
 import { people, assignments, projects, personCapacityPeriods } from "../schema";
-import { eq, asc, desc } from "drizzle-orm";
+import { eq, asc, desc, inArray } from "drizzle-orm";
 import { asyncHandler } from "../asyncHandler";
 import { logActivity } from "../activityLog";
 
@@ -123,6 +123,21 @@ peopleRouter.post("/import", asyncHandler(async (req, res) => {
     }
   }
   res.json({ imported, skipped: errors.length, errors });
+}));
+
+peopleRouter.post("/bulk-delete", asyncHandler(async (req, res) => {
+  const parsed = z.object({ ids: z.array(z.number().int().positive()).min(1).max(500) }).safeParse(req.body);
+  if (!parsed.success) return res.status(400).json({ error: "Selezionare almeno una persona" });
+
+  const uniqueIds = [...new Set(parsed.data.ids)];
+  const existing = await db.select({ id: people.id, name: people.name }).from(people).where(inArray(people.id, uniqueIds));
+  if (existing.length !== uniqueIds.length) {
+    return res.status(404).json({ error: "Una o più persone non sono state trovate" });
+  }
+
+  await db.delete(people).where(inArray(people.id, uniqueIds));
+  await Promise.all(existing.map((person) => logActivity(req.user!, "deleted", "persona", person.id, person.name, "Eliminazione multipla")));
+  res.json({ deleted: existing.length });
 }));
 
 peopleRouter.get("/:id", asyncHandler(async (req, res) => {

@@ -1,0 +1,18 @@
+﻿sequenceDiagram
+    actor PM as Pianificatore
+    participant SPA as React SPA
+    participant API as Express (/api/assignments)
+    participant DB as PostgreSQL
+
+    PM->>SPA: crea nuova assegnazione con "sovrascrivi"
+    SPA->>API: POST /api/assignments/overwrite
+    API->>DB: SELECT assegnazioni esistenti (stessa persona+progetto)
+    DB-->>API: righe esistenti
+    loop per ogni riga che si sovrappone
+        API->>API: calcola tipo di sovrapposizione
+        API->>DB: UPDATE (tronca) / INSERT (divide) / DELETE (copertura totale)
+    end
+    API->>DB: INSERT nuova assegnazione
+    API->>DB: INSERT activity_log (created, "assegnazione")
+    API-->>SPA: 201 nuova assegnazione
+

@@ -1,0 +1,19 @@
+﻿flowchart LR
+    subgraph Browser
+        SPA["React SPA<br/>(wouter router, Tailwind)"]
+    end
+
+    subgraph "Azure App Service (Linux, Node.js)"
+        API["Express API<br/>+ file statici della SPA"]
+    end
+
+    subgraph "Azure Database for PostgreSQL<br/>Flexible Server"
+        DB[(PostgreSQL)]
+    end
+
+    SPA -- "fetch /api/* <br/>cookie httpOnly JWT" --> API
+    API -- "Drizzle ORM<br/>TLS (sslmode=require)" --> DB
+
+    GH["GitHub Actions<br/>(CI/CD)"] -. "npm run build<br/>+ deploy pacchetto" .-> API
+    GH -. "drizzle-kit migrate" .-> DB
+

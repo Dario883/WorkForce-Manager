@@ -1,8 +1,8 @@
-import { Router } from "express";
+import { Router, type Response } from "express";
 import { z } from "zod";
 import Papa from "papaparse";
 import { db } from "../db";
-import { assignments, people, projects } from "../schema";
+import { absences, assignments, holidays, people, projects } from "../schema";
 import { eq, and, gte, lte, asc, ilike } from "drizzle-orm";
 import { asyncHandler } from "../asyncHandler";
 import { logActivity } from "../activityLog";
@@ -18,6 +18,44 @@ import {
 } from "date-fns";
 
 export const assignmentsRouter = Router();
+
+export async function assignmentDateConflict(personId: number, startDate: string, endDate: string): Promise<string | null> {
+  const [holiday] = await db
+    .select({ name: holidays.name, date: holidays.date })
+    .from(holidays)
+    .where(and(gte(holidays.date, startDate), lte(holidays.date, endDate)))
+    .limit(1);
+  if (holiday) return `La data ${holiday.date} è festiva (${holiday.name})`;
+
+  const [absence] = await db
+    .select({ startDate: absences.startDate, endDate: absences.endDate })
+    .from(absences)
+    .where(
+      and(
+        eq(absences.personId, personId),
+        eq(absences.status, "approvata"),
+        lte(absences.startDate, endDate),
+        gte(absences.endDate, startDate)
+      )
+    )
+    .limit(1);
+  if (absence) return `La persona ha un'assenza approvata dal ${absence.startDate} al ${absence.endDate}`;
+  return null;
+}
+
+async function rejectDateConflict(
+  res: Response,
+  personId: number,
+  startDate: string,
+  endDate: string
+) {
+  const conflict = await assignmentDateConflict(personId, startDate, endDate);
+  if (conflict) {
+    res.status(409).json({ error: conflict });
+    return true;
+  }
+  return false;
+}
 
 const assignmentSchema = z.object({
   personId: z.number().int(),
@@ -137,6 +175,10 @@ assignmentsRouter.post("/import", asyncHandler(async (req, res) => {
     }
 
     try {
+      if (await assignmentDateConflict(person.id, startDate, endDate)) {
+        skipped++;
+        continue;
+      }
       await db.insert(assignments).values({
         personId: person.id,
         projectId: project.id,
@@ -165,6 +207,7 @@ async function assignmentLabel(personId: number, projectId: number): Promise<str
 assignmentsRouter.post("/", asyncHandler(async (req, res) => {
   const parsed = assignmentSchema.safeParse(req.body);
   if (!parsed.success) return res.status(400).json({ error: parsed.error.flatten() });
+  if (await rejectDateConflict(res, parsed.data.personId, parsed.data.startDate, parsed.data.endDate)) return;
   const [created] = await db.insert(assignments).values(parsed.data).returning();
   await logActivity(
     req.user!,
@@ -187,6 +230,7 @@ assignmentsRouter.post("/", asyncHandler(async (req, res) => {
 assignmentsRouter.post("/overwrite", asyncHandler(async (req, res) => {
   const parsed = assignmentSchema.safeParse(req.body);
   if (!parsed.success) return res.status(400).json({ error: parsed.error.flatten() });
+  if (await rejectDateConflict(res, parsed.data.personId, parsed.data.startDate, parsed.data.endDate)) return;
   const { personId, projectId, startDate, endDate } = parsed.data;
 
   const existing = await db
@@ -244,12 +288,17 @@ assignmentsRouter.put("/:id", asyncHandler(async (req, res) => {
   const id = Number(req.params.id);
   const parsed = assignmentSchema.partial().safeParse(req.body);
   if (!parsed.success) return res.status(400).json({ error: parsed.error.flatten() });
+  const [existing] = await db.select().from(assignments).where(eq(assignments.id, id)).limit(1);
+  if (!existing) return res.status(404).json({ error: "Assegnazione non trovata" });
+  const nextPersonId = parsed.data.personId ?? existing.personId;
+  const nextStartDate = parsed.data.startDate ?? existing.startDate;
+  const nextEndDate = parsed.data.endDate ?? existing.endDate;
+  if (await rejectDateConflict(res, nextPersonId, nextStartDate, nextEndDate)) return;
   const [updated] = await db
     .update(assignments)
     .set({ ...parsed.data, updatedAt: new Date() })
     .where(eq(assignments.id, id))
     .returning();
-  if (!updated) return res.status(404).json({ error: "Assegnazione non trovata" });
   await logActivity(
     req.user!,
     "updated",
@@ -312,6 +361,8 @@ assignmentsRouter.post("/:id/split", asyncHandler(async (req, res) => {
 
   const effectiveStart = unitStart < origStart ? origStart : unitStart;
   const effectiveEnd = unitEnd > origEnd ? origEnd : unitEnd;
+
+  if (await rejectDateConflict(res, original.personId, fmt(effectiveStart), fmt(effectiveEnd))) return;
 
   const newRows = [];
 

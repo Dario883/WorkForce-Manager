@@ -21,6 +21,41 @@ describe.skipIf(!process.env.TEST_DATABASE_URL)("/api/assignments", () => {
     expect(res.status).toBe(201);
   });
 
+  it("rejects assignments overlapping a holiday", async () => {
+    const { agent, personId, projectId } = await setup();
+    await agent.post("/api/holidays").send({ date: "2026-05-01", name: "Festa del lavoro" });
+    const res = await agent.post("/api/assignments").send({
+      personId,
+      projectId,
+      percentage: 50,
+      startDate: "2026-05-01",
+      endDate: "2026-05-01",
+    });
+    expect(res.status).toBe(409);
+    expect(res.body.error).toContain("festiva");
+  });
+
+  it("rejects assignments overlapping an approved absence", async () => {
+    const { agent, personId, projectId } = await setup();
+    await agent.post("/api/absences").send({
+      personId,
+      type: "ferie",
+      startDate: "2026-06-15",
+      endDate: "2026-06-15",
+    });
+    const absences = await agent.get("/api/absences");
+    await agent.put(`/api/absences/${absences.body[0].id}/status`).send({ status: "approvata" });
+    const res = await agent.post("/api/assignments").send({
+      personId,
+      projectId,
+      percentage: 50,
+      startDate: "2026-06-15",
+      endDate: "2026-06-15",
+    });
+    expect(res.status).toBe(409);
+    expect(res.body.error).toContain("assenza approvata");
+  });
+
   describe("POST /overwrite", () => {
     it("drops an existing assignment fully covered by the new range", async () => {
       const { agent, personId, projectId } = await setup();

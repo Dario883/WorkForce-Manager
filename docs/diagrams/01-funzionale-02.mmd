@@ -1,0 +1,9 @@
+﻿stateDiagram-v2
+    [*] --> in_attesa: creazione assenza
+    in_attesa --> approvata: un Responsabile approva
+    in_attesa --> rifiutata: un Responsabile rifiuta
+    approvata --> rifiutata: correzione manuale
+    rifiutata --> approvata: correzione manuale
+    approvata --> [*]
+    rifiutata --> [*]
+

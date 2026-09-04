@@ -1,0 +1,96 @@
+﻿erDiagram
+    USERS {
+        int id PK
+        varchar email UK
+        text password_hash
+        varchar name
+        boolean active
+        jsonb permissions "null = accesso completo"
+        timestamp created_at
+    }
+
+    PEOPLE {
+        int id PK
+        varchar name
+        varchar email
+        varchar role
+        enum type "consulente/stage/dipendente"
+        varchar avatar_color
+        real capacity_hours_per_week
+        int manager_id FK "self-reference"
+        boolean is_approver
+        timestamp created_at
+        timestamp updated_at
+    }
+
+    PROJECTS {
+        int id PK
+        varchar commessa_id UK
+        varchar name UK
+        varchar client
+        enum status "planned/active/on_hold/completed"
+        enum delivery_type "TK/T&M/TaaS/AMS"
+        varchar color
+        int pm_id FK
+        date start_date
+        date end_date
+    }
+
+    ASSIGNMENTS {
+        int id PK
+        int person_id FK
+        int project_id FK
+        real percentage
+        date start_date
+        date end_date
+        enum period_type "day/week/month/year"
+    }
+
+    ABSENCES {
+        int id PK
+        int person_id FK
+        enum type "ferie/malattia/permesso/formazione/altro"
+        enum status "in_attesa/approvata/rifiutata"
+        date start_date
+        date end_date
+        real hours "null = giornate intere; valorizzato = assenza oraria su un giorno"
+        text notes
+    }
+
+    PERSON_CAPACITY_PERIODS {
+        int id PK
+        int person_id FK
+        date start_date
+        date end_date "null = a tempo indeterminato"
+        real hours_per_week
+    }
+
+    HOLIDAYS {
+        int id PK
+        date date UK
+        varchar name
+    }
+
+    SETTINGS {
+        varchar key PK
+        text value
+    }
+
+    ACTIVITY_LOG {
+        int id PK
+        int user_id "denormalizzato, non FK"
+        varchar user_name "denormalizzato, non FK"
+        enum action "created/updated/deleted"
+        varchar entity_type
+        int entity_id "denormalizzato, non FK"
+        varchar entity_name
+        timestamp created_at
+    }
+
+    PEOPLE ||--o{ PEOPLE : "manager_id"
+    PEOPLE ||--o{ PROJECTS : "pm_id"
+    PEOPLE ||--o{ ASSIGNMENTS : "person_id"
+    PROJECTS ||--o{ ASSIGNMENTS : "project_id"
+    PEOPLE ||--o{ ABSENCES : "person_id"
+    PEOPLE ||--o{ PERSON_CAPACITY_PERIODS : "person_id"
+

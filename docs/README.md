@@ -10,11 +10,14 @@ essere aggiornata insieme ad esso (non è un documento "una tantum").
 | [02-architettura.md](02-architettura.md) | Vista d'insieme, layer applicativi, diagrammi UML (classi, sequenza), modello dati (ER), diagramma di deployment |
 | [03-tecnica.md](03-tecnica.md) | Stack tecnologico, struttura del repository, riferimento API, strategia di test, pipeline CI/CD |
 | [04-sicurezza.md](04-sicurezza.md) | Autenticazione, modello di autorizzazione, gestione sessioni, audit trail, gestione segreti, rischi noti |
+| [backlog.md](backlog.md) | Backlog prodotto con priorità, criteri di accettazione, dipendenze e decisioni aperte |
 
 Disponibile anche come documento unico Word:
 [`WorkForce-Manager-Documentazione.docx`](WorkForce-Manager-Documentazione.docx)
-(stessi contenuti dei quattro file, con indice e diagrammi incorporati come
-immagini — rigenerato dagli stessi sorgenti Markdown, non mantenuto a mano).
+(con indice, rigenerato dai quattro sorgenti Markdown tramite
+[`generate-docx.ps1`](generate-docx.ps1), non mantenuto a mano). Il processo
+genera le immagini PNG in `docs/diagrams/` e incorpora nel documento Word i
+diagrammi Mermaid renderizzati.
 
 ## Come leggerla
 

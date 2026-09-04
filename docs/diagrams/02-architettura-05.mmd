@@ -1,0 +1,11 @@
+﻿flowchart TB
+    L1["Presentazione â€” client/src/pages, components<br/>React, Tailwind, wouter"]
+    L2["Stato/integrazione client â€” client/src/lib<br/>api.ts (fetch wrapper + ApiError), auth.tsx (contesto React), theme.tsx"]
+    L3["Trasporto â€” HTTP/JSON su cookie httpOnly<br/>(nessun token in localStorage)"]
+    L4["Instradamento + middleware â€” server/app.ts<br/>express.json, cookieParser, attachUser, requireAuth, requireTab/requireTabWrite"]
+    L5["Logica di dominio â€” server/routes/*.ts<br/>validazione (zod), regole di business, audit log"]
+    L6["Accesso ai dati â€” server/db.ts, server/schema.ts<br/>Drizzle ORM (query builder tipizzato)"]
+    L7[("Persistenza â€” PostgreSQL")]
+
+    L1 --> L2 --> L3 --> L4 --> L5 --> L6 --> L7
+

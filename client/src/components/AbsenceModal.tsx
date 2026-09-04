@@ -64,6 +64,7 @@ export default function AbsenceModal({
   const [type, setType] = useState<AbsenceType>("ferie");
   const [startDate, setStartDate] = useState("");
   const [endDate, setEndDate] = useState("");
+  const [hours, setHours] = useState("");
   const [notes, setNotes] = useState("");
   const [saving, setSaving] = useState(false);
 
@@ -73,12 +74,14 @@ export default function AbsenceModal({
       setType(absence.type);
       setStartDate(absence.startDate);
       setEndDate(absence.endDate);
+      setHours(absence.hours == null ? "" : String(absence.hours));
       setNotes(absence.notes ?? "");
     } else {
       setPersonId(lockedPerson ? lockedPerson.id : people[0]?.id ?? "");
       setType("ferie");
       setStartDate(defaultStartDate ?? "");
       setEndDate(defaultEndDate ?? "");
+      setHours("");
       setNotes("");
     }
   }, [absence, open, people, lockedPerson, defaultStartDate, defaultEndDate]);
@@ -92,6 +95,7 @@ export default function AbsenceModal({
       type,
       startDate,
       endDate,
+      hours: hours ? Number(hours) : null,
       notes: notes || null,
     };
     try {
@@ -146,6 +150,9 @@ export default function AbsenceModal({
             <Input type="date" value={endDate} onChange={(e) => setEndDate(e.target.value)} required />
           </Field>
         </div>
+        <Field label="Ore (opzionale, per assenza oraria nella giornata selezionata)">
+          <Input type="number" min={0.5} max={24} step={0.5} value={hours} onChange={(e) => setHours(e.target.value)} placeholder="Lascia vuoto per giorni interi" />
+        </Field>
         <Field label="Note">
           <Input value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="Facoltativo" />
         </Field>

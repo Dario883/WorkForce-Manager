@@ -44,6 +44,7 @@ export interface Absence {
   status: AbsenceStatus;
   startDate: string;
   endDate: string;
+  hours: number | null;
   notes: string | null;
   createdAt: string;
   updatedAt: string;

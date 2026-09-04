@@ -29,6 +29,19 @@ describe.skipIf(!process.env.TEST_DATABASE_URL)("/api/absences", () => {
     expect(res.status).toBe(400);
   });
 
+  it("supports an hourly absence on a single day", async () => {
+    const agent = await adminAgent();
+    const person = await agent.post("/api/people").send({ name: "Mario Rossi" });
+    const res = await agent.post("/api/absences").send({
+      personId: person.body.id,
+      startDate: "2026-08-01",
+      endDate: "2026-08-01",
+      hours: 4,
+    });
+    expect(res.status).toBe(201);
+    expect(res.body.hours).toBe(4);
+  });
+
   it("transitions status via PUT /:id/status and records an activity log entry", async () => {
     const agent = await adminAgent();
     const person = await agent.post("/api/people").send({ name: "Mario Rossi" });

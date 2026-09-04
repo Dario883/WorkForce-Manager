@@ -74,6 +74,25 @@ describe.skipIf(!process.env.TEST_DATABASE_URL)("/api/people", () => {
     expect(get.status).toBe(404);
   });
 
+  it("deletes multiple people and cascades related data", async () => {
+    const agent = await adminAgent();
+    const first = await agent.post("/api/people").send({ name: "Bulk One" });
+    const second = await agent.post("/api/people").send({ name: "Bulk Two" });
+    const project = await agent.post("/api/projects").send({ name: "Bulk Project" });
+    await agent.post("/api/assignments").send({
+      personId: first.body.id,
+      projectId: project.body.id,
+      percentage: 50,
+      startDate: "2026-01-01",
+      endDate: "2026-01-31",
+    });
+    const response = await agent.post("/api/people/bulk-delete").send({ ids: [first.body.id, second.body.id] });
+    expect(response.status).toBe(200);
+    expect(response.body.deleted).toBe(2);
+    expect((await agent.get("/api/people")).body).toHaveLength(0);
+    expect((await agent.get("/api/assignments")).body).toHaveLength(0);
+  });
+
   it("imports people from CSV, skipping rows without a name", async () => {
     const agent = await adminAgent();
     const csv = "name,email,role,capacityHoursPerWeek,avatarColor\nAda Lovelace,ada@test.local,Dev,40,#3457d5\n,skip@test.local,Dev,40,#3457d5\n";

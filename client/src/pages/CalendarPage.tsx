@@ -253,6 +253,8 @@ export default function CalendarPage() {
   const [personAssignments, setPersonAssignments] = useState<Record<number, Assignment[]>>({});
   const [loadingRows, setLoadingRows] = useState<Record<number, boolean>>({});
   const [addFor, setAddFor] = useState<{ id: number; name: string } | null>(null);
+  const [personSearch, setPersonSearch] = useState("");
+  const [selectedPeople, setSelectedPeople] = useState<Set<number>>(new Set());
 
   const range =
     view === "week"
@@ -284,6 +286,22 @@ export default function CalendarPage() {
 
   const columns = buildColumns(view, range.start, range.end);
   const todayStr = format(new Date(), "yyyy-MM-dd");
+  const visiblePeople = (snapshot?.people ?? []).filter((person) => person.personName.toLowerCase().includes(personSearch.trim().toLowerCase()));
+
+  function togglePerson(personId: number) {
+    setSelectedPeople((prev) => {
+      const next = new Set(prev);
+      if (next.has(personId)) next.delete(personId);
+      else next.add(personId);
+      return next;
+    });
+  }
+
+  function toggleAllVisiblePeople() {
+    setSelectedPeople((prev) => (visiblePeople.length > 0 && visiblePeople.every((person) => prev.has(person.personId))
+      ? new Set([...prev].filter((id) => !visiblePeople.some((person) => person.personId === id)))
+      : new Set([...prev, ...visiblePeople.map((person) => person.personId)])));
+  }
 
   function shiftPeriod(dir: 1 | -1) {
     setAnchor((a) => (view === "week" ? addWeeks(a, dir) : view === "year" ? addYears(a, dir) : addMonths(a, dir)));
@@ -403,18 +421,28 @@ export default function CalendarPage() {
         </div>
       </div>
 
+      <div className="mb-4 flex flex-wrap items-center gap-3">
+        <Input className="max-w-sm" value={personSearch} onChange={(event) => setPersonSearch(event.target.value)} placeholder="Cerca persona…" />
+        <button type="button" className="text-sm font-medium text-brand-600 hover:underline dark:text-brand-400" onClick={toggleAllVisiblePeople}>
+          {visiblePeople.length > 0 && visiblePeople.every((person) => selectedPeople.has(person.personId)) ? "Deseleziona filtrate" : "Seleziona filtrate"}
+        </button>
+        {selectedPeople.size > 0 && <span className="text-xs text-slate-500 dark:text-slate-400">{selectedPeople.size} persone selezionate</span>}
+      </div>
+
       <Card>
         <CardBody className="overflow-x-auto p-0">
           {loading || !snapshot ? (
             <p className="p-6 text-center text-sm text-slate-400 dark:text-slate-500">Caricamento…</p>
           ) : snapshot.people.length === 0 ? (
             <p className="p-6 text-center text-sm text-slate-400 dark:text-slate-500">Nessuna persona registrata</p>
+          ) : visiblePeople.length === 0 ? (
+            <p className="p-6 text-center text-sm text-slate-400 dark:text-slate-500">Nessuna persona corrisponde alla ricerca</p>
           ) : (
             <table className="w-full border-collapse text-sm">
               <thead>
                 <tr>
                   <th className="sticky left-0 z-10 min-w-[200px] border-b border-r border-slate-100 dark:border-slate-700 bg-white dark:bg-slate-800 px-4 py-3 text-left text-xs uppercase text-slate-500 dark:text-slate-400">
-                    Persona
+                    <label className="flex items-center gap-2"><input type="checkbox" checked={visiblePeople.length > 0 && visiblePeople.every((person) => selectedPeople.has(person.personId))} onChange={toggleAllVisiblePeople} /> Persona</label>
                   </th>
                   {columns.map((col) => {
                     const isToday = col.rangeStart <= todayStr && todayStr <= col.rangeEnd;
@@ -452,7 +480,7 @@ export default function CalendarPage() {
                 </tr>
               </thead>
               <tbody>
-                {dataMode === "staffing" && snapshot.people.map((person) => {
+                {dataMode === "staffing" && visiblePeople.map((person) => {
                   const isExpanded = !!expanded[person.personId];
                   const rows = personAssignments[person.personId] ?? [];
                   const visibleRows = rows.filter(
@@ -463,6 +491,7 @@ export default function CalendarPage() {
                     <Fragment key={person.personId}>
                       <tr className="border-b border-slate-50 dark:border-slate-700">
                         <td className="sticky left-0 z-10 border-r border-slate-100 dark:border-slate-700 bg-white dark:bg-slate-800 px-4 py-2 font-medium text-slate-700 dark:text-slate-200">
+                          <input className="mr-2" type="checkbox" checked={selectedPeople.has(person.personId)} onChange={() => togglePerson(person.personId)} />
                           <button
                             className="mr-2 inline-flex h-5 w-5 items-center justify-center rounded border border-slate-200 dark:border-slate-600 text-xs text-slate-500 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-700"
                             onClick={() => toggleExpand(person.personId)}
@@ -476,6 +505,9 @@ export default function CalendarPage() {
                           const cell = snapshotDayForColumn(person, col);
                           const total = cell?.total ?? 0;
                           const isToday = col.rangeStart <= todayStr && todayStr <= col.rangeEnd;
+                          const holiday = holidayForColumn(col, holidays);
+                          const approvedAbsence = absenceForColumn(person.personId, col, absences)?.status === "approvata";
+                          const blocked = !!holiday || approvedAbsence;
                           const label =
                             viewUnit === "percentage"
                               ? total > 0
@@ -486,7 +518,7 @@ export default function CalendarPage() {
                             <td key={col.key} className={`p-1 text-center ${isToday ? "bg-brand-50/40 dark:bg-brand-500/10" : ""}`}>
                               <button
                                 onClick={() =>
-                                  setEditCell({
+                                  !blocked && setEditCell({
                                     personId: person.personId,
                                     personName: person.personName,
                                     rangeStart: col.rangeStart,
@@ -494,10 +526,11 @@ export default function CalendarPage() {
                                     unit: col.unit,
                                   })
                                 }
-                                className={`h-10 w-full rounded-md text-xs font-semibold transition hover:ring-2 hover:ring-brand-300 ${allocColor(
+                                disabled={blocked}
+                                className={`h-10 w-full rounded-md text-xs font-semibold transition ${blocked ? "cursor-not-allowed bg-slate-100 text-slate-400 dark:bg-slate-700/60 dark:text-slate-500" : "hover:ring-2 hover:ring-brand-300"} ${!blocked ? allocColor(
                                   total
-                                )} ${isToday ? "ring-1 ring-brand-400" : ""}`}
-                                title={cell?.items.map((i) => `${i.projectName}: ${i.percentage}%`).join("\n")}
+                                ) : ""} ${isToday ? "ring-1 ring-brand-400" : ""}`}
+                                title={blocked ? (holiday ? `Festività: ${holiday.name}` : "Assenza approvata: censimento bloccato") : `${cell?.items.map((i) => `${i.projectName}: ${i.percentage}%`).join("\n") ?? "Nessuna assegnazione"}\n${pctToHoursLabel(total, person.capacityHoursPerWeek, col.weekend)}`}
                               >
                                 {label}
                               </button>
@@ -573,6 +606,8 @@ export default function CalendarPage() {
                                         className={`h-8 w-full rounded border bg-white dark:bg-slate-900 text-center text-xs text-slate-900 dark:text-slate-100 placeholder:text-slate-300 dark:placeholder:text-slate-600 focus:border-brand-400 focus:outline-none ${
                                           isToday ? "border-brand-300 dark:border-brand-500" : "border-slate-200 dark:border-slate-600"
                                         }`}
+                                        disabled={!!holidayForColumn(col, holidays) || absenceForColumn(person.personId, col, absences)?.status === "approvata"}
+                                        title={pct === null ? undefined : `${pct}% = ${pctToHoursLabel(pct, person.capacityHoursPerWeek, col.weekend)}`}
                                         onBlur={(e) => {
                                           const raw = e.target.value.trim();
                                           if (raw === "") return;
@@ -620,9 +655,10 @@ export default function CalendarPage() {
                 })}
 
                 {dataMode === "absences" &&
-                  snapshot.people.map((person) => (
+                  visiblePeople.map((person) => (
                     <tr key={person.personId} className="border-b border-slate-50 dark:border-slate-700">
                       <td className="sticky left-0 z-10 border-r border-slate-100 dark:border-slate-700 bg-white dark:bg-slate-800 px-4 py-2 font-medium text-slate-700 dark:text-slate-200">
+                        <input className="mr-2" type="checkbox" checked={selectedPeople.has(person.personId)} onChange={() => togglePerson(person.personId)} />
                         {person.personName}
                       </td>
                       {columns.map((col) => {

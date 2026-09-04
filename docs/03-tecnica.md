@@ -128,7 +128,7 @@ indicato — vedi [04-sicurezza.md](04-sicurezza.md) per il dettaglio completo.
 | Risorsa | Endpoint principali | Permesso (scrittura) |
 |---|---|---|
 | Auth | `POST /auth/login`, `POST /auth/logout`, `GET /auth/me` | pubblico |
-| Persone | `GET/POST /people`, `GET/PUT/DELETE /people/:id`, `GET/POST/DELETE /people/:id/capacity(/:capacityId)`, `GET /people/:id/assignments`, `GET /people/export`, `POST /people/import` | `people` |
+| Persone | `GET/POST /people`, `GET/PUT/DELETE /people/:id`, `POST /people/bulk-delete`, `GET/POST/DELETE /people/:id/capacity(/:capacityId)`, `GET /people/:id/assignments`, `GET /people/export`, `POST /people/import` | `people` |
 | Progetti | `GET/POST /projects`, `GET/PUT/DELETE /projects/:id`, `GET /projects/export`, `POST /projects/import` | `projects` |
 | Assegnazioni | `GET/POST /assignments`, `PUT/DELETE /assignments/:id`, `POST /assignments/overwrite`, `POST /assignments/:id/split`, `GET /assignments/export`, `POST /assignments/import` | `staffing` |
 | Staffing (sola lettura) | `GET /staffing/snapshot?from&to` | — (nessun permesso dedicato, solo autenticazione) |
@@ -143,6 +143,10 @@ Note endpoint:
 - `POST /people/import` restituisce anche `errors: { row, reason }[]` in caso
   di righe scartate, così il frontend può mostrare il motivo puntuale nel
   popup di import.
+- Le mutazioni delle assegnazioni rifiutano intervalli che intersecano una
+  festività o un'assenza approvata (`409`).
+- Le assenze supportano il campo opzionale `hours`, valido solo quando
+  `startDate` e `endDate` coincidono.
 
 ## 5. Testing
 

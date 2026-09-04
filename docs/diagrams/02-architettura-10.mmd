@@ -1,0 +1,12 @@
+﻿sequenceDiagram
+    actor U as Utente ristretto
+    participant SPA as React SPA
+    participant API as Express
+
+    U->>SPA: naviga su /people
+    SPA->>API: POST /api/people (crea persona)
+    API->>API: requireAuth â†’ OK (autenticato)
+    API->>API: requireTabWrite("people") â†’ permessi non includono "people"
+    API-->>SPA: 403 {error: "Non hai i permessi..."}
+    SPA-->>U: mostra errore / la SPA nasconde giÃ <br/>la sezione in navigazione
+
