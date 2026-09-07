@@ -87,6 +87,8 @@ con stato diverso da `active`. Import/export CSV.
 
 ### 3.6 Calendario (`/calendar`)
 Vista a griglia persona × periodo (settimana/mese/anno), con due modalità:
+- un filtro persone ricercabile e multiselezione permette di mostrare solo
+  una o più risorse specifiche, senza modificare o selezionare le righe;
 - **Staffing**: percentuale di allocazione per giorno/periodo, colorata in
   base alle soglie (sotto-allocato / 70–100% / sovra-allocato), con editing
   inline (click su una cella per modificare la percentuale di

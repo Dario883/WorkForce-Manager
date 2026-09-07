@@ -34,3 +34,22 @@ test("creates a project and sees it in the projects list", async ({ page }) => {
 
   await expect(page.getByText(name)).toBeVisible();
 });
+
+test("filters calendar rows by selected people", async ({ page }) => {
+  const suffix = Date.now();
+  const selectedName = `E2E Calendar Selected ${suffix}`;
+  const hiddenName = `E2E Calendar Hidden ${suffix}`;
+  await page.request.post("/api/people", { data: { name: selectedName } });
+  await page.request.post("/api/people", { data: { name: hiddenName } });
+
+  await page.goto("/calendar");
+  await expect(page.locator("tbody").getByText(selectedName)).toBeVisible();
+  await expect(page.locator("tbody").getByText(hiddenName)).toBeVisible();
+
+  await page.getByRole("button", { name: "Tutte le persone" }).click();
+  await page.getByLabel(selectedName).check();
+  await page.getByRole("button", { name: "1 persona selezionata" }).click();
+
+  await expect(page.locator("tbody").getByText(selectedName)).toBeVisible();
+  await expect(page.locator("tbody").getByText(hiddenName)).not.toBeVisible();
+});

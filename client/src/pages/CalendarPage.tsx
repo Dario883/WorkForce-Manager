@@ -254,7 +254,8 @@ export default function CalendarPage() {
   const [loadingRows, setLoadingRows] = useState<Record<number, boolean>>({});
   const [addFor, setAddFor] = useState<{ id: number; name: string } | null>(null);
   const [personSearch, setPersonSearch] = useState("");
-  const [selectedPeople, setSelectedPeople] = useState<Set<number>>(new Set());
+  const [personFilter, setPersonFilter] = useState<Set<number>>(new Set());
+  const [personFilterOpen, setPersonFilterOpen] = useState(false);
 
   const range =
     view === "week"
@@ -286,10 +287,14 @@ export default function CalendarPage() {
 
   const columns = buildColumns(view, range.start, range.end);
   const todayStr = format(new Date(), "yyyy-MM-dd");
-  const visiblePeople = (snapshot?.people ?? []).filter((person) => person.personName.toLowerCase().includes(personSearch.trim().toLowerCase()));
+  const allPeople = snapshot?.people ?? [];
+  const matchingPeople = allPeople.filter((person) =>
+    person.personName.toLowerCase().includes(personSearch.trim().toLowerCase())
+  );
+  const visiblePeople = allPeople.filter((person) => personFilter.size === 0 || personFilter.has(person.personId));
 
-  function togglePerson(personId: number) {
-    setSelectedPeople((prev) => {
+  function togglePersonFilter(personId: number) {
+    setPersonFilter((prev) => {
       const next = new Set(prev);
       if (next.has(personId)) next.delete(personId);
       else next.add(personId);
@@ -297,10 +302,8 @@ export default function CalendarPage() {
     });
   }
 
-  function toggleAllVisiblePeople() {
-    setSelectedPeople((prev) => (visiblePeople.length > 0 && visiblePeople.every((person) => prev.has(person.personId))
-      ? new Set([...prev].filter((id) => !visiblePeople.some((person) => person.personId === id)))
-      : new Set([...prev, ...visiblePeople.map((person) => person.personId)])));
+  function selectMatchingPeople() {
+    setPersonFilter((prev) => new Set([...prev, ...matchingPeople.map((person) => person.personId)]));
   }
 
   function shiftPeriod(dir: 1 | -1) {
@@ -421,12 +424,39 @@ export default function CalendarPage() {
         </div>
       </div>
 
-      <div className="mb-4 flex flex-wrap items-center gap-3">
-        <Input className="max-w-sm" value={personSearch} onChange={(event) => setPersonSearch(event.target.value)} placeholder="Cerca persona…" />
-        <button type="button" className="text-sm font-medium text-brand-600 hover:underline dark:text-brand-400" onClick={toggleAllVisiblePeople}>
-          {visiblePeople.length > 0 && visiblePeople.every((person) => selectedPeople.has(person.personId)) ? "Deseleziona filtrate" : "Seleziona filtrate"}
+      <div className="relative mb-4 w-full max-w-md">
+        <button
+          type="button"
+          aria-expanded={personFilterOpen}
+          onClick={() => setPersonFilterOpen((open) => !open)}
+          className="flex w-full items-center justify-between rounded-lg border border-slate-300 bg-white px-3 py-2 text-left text-sm text-slate-700 focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500 dark:border-slate-600 dark:bg-slate-900 dark:text-slate-200"
+        >
+          <span>{personFilter.size === 0 ? "Tutte le persone" : personFilter.size === 1 ? "1 persona selezionata" : `${personFilter.size} persone selezionate`}</span>
+          <span aria-hidden="true" className="text-slate-400">{personFilterOpen ? "▲" : "▼"}</span>
         </button>
-        {selectedPeople.size > 0 && <span className="text-xs text-slate-500 dark:text-slate-400">{selectedPeople.size} persone selezionate</span>}
+        {personFilterOpen && (
+          <div className="absolute z-30 mt-1 w-full rounded-lg border border-slate-200 bg-white p-3 shadow-lg dark:border-slate-600 dark:bg-slate-800">
+            <Input value={personSearch} onChange={(event) => setPersonSearch(event.target.value)} placeholder="Cerca persona…" autoFocus />
+            <div className="mt-2 flex items-center justify-between border-b border-slate-100 pb-2 text-xs dark:border-slate-700">
+              <button type="button" className="font-medium text-brand-600 hover:underline dark:text-brand-400" onClick={selectMatchingPeople}>
+                Seleziona risultati
+              </button>
+              <button type="button" className="font-medium text-slate-500 hover:underline dark:text-slate-400" onClick={() => setPersonFilter(new Set())}>
+                Mostra tutte
+              </button>
+            </div>
+            <div className="mt-2 max-h-56 space-y-1 overflow-y-auto">
+              {matchingPeople.length === 0 ? (
+                <p className="py-3 text-center text-xs text-slate-400">Nessuna persona trovata</p>
+              ) : matchingPeople.map((person) => (
+                <label key={person.personId} className="flex cursor-pointer items-center gap-2 rounded px-2 py-1.5 text-sm text-slate-700 hover:bg-slate-50 dark:text-slate-200 dark:hover:bg-slate-700">
+                  <input type="checkbox" checked={personFilter.has(person.personId)} onChange={() => togglePersonFilter(person.personId)} />
+                  <span>{person.personName}</span>
+                </label>
+              ))}
+            </div>
+          </div>
+        )}
       </div>
 
       <Card>
@@ -442,7 +472,7 @@ export default function CalendarPage() {
               <thead>
                 <tr>
                   <th className="sticky left-0 z-10 min-w-[200px] border-b border-r border-slate-100 dark:border-slate-700 bg-white dark:bg-slate-800 px-4 py-3 text-left text-xs uppercase text-slate-500 dark:text-slate-400">
-                    <label className="flex items-center gap-2"><input type="checkbox" checked={visiblePeople.length > 0 && visiblePeople.every((person) => selectedPeople.has(person.personId))} onChange={toggleAllVisiblePeople} /> Persona</label>
+                    Persona
                   </th>
                   {columns.map((col) => {
                     const isToday = col.rangeStart <= todayStr && todayStr <= col.rangeEnd;
@@ -491,7 +521,6 @@ export default function CalendarPage() {
                     <Fragment key={person.personId}>
                       <tr className="border-b border-slate-50 dark:border-slate-700">
                         <td className="sticky left-0 z-10 border-r border-slate-100 dark:border-slate-700 bg-white dark:bg-slate-800 px-4 py-2 font-medium text-slate-700 dark:text-slate-200">
-                          <input className="mr-2" type="checkbox" checked={selectedPeople.has(person.personId)} onChange={() => togglePerson(person.personId)} />
                           <button
                             className="mr-2 inline-flex h-5 w-5 items-center justify-center rounded border border-slate-200 dark:border-slate-600 text-xs text-slate-500 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-700"
                             onClick={() => toggleExpand(person.personId)}
@@ -658,7 +687,6 @@ export default function CalendarPage() {
                   visiblePeople.map((person) => (
                     <tr key={person.personId} className="border-b border-slate-50 dark:border-slate-700">
                       <td className="sticky left-0 z-10 border-r border-slate-100 dark:border-slate-700 bg-white dark:bg-slate-800 px-4 py-2 font-medium text-slate-700 dark:text-slate-200">
-                        <input className="mr-2" type="checkbox" checked={selectedPeople.has(person.personId)} onChange={() => togglePerson(person.personId)} />
                         {person.personName}
                       </td>
                       {columns.map((col) => {

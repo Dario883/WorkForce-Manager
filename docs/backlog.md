@@ -85,18 +85,21 @@ per errore.
 - il log attività registra ogni eliminazione o un evento bulk con l'elenco
   degli ID coinvolti.
 
-### WFM-004 — Ricerca e selezione multipla nel Calendario
+### WFM-004 — Filtro multiselezione persone nel Calendario
 
 **Area:** Calendario · **Priorità:** P1 · **Tipo:** UX
 
-Aggiungere un campo di ricerca per filtrare le persone visualizzate e una
-selezione multipla per concentrarsi su una o più risorse specifiche.
+Aggiungere un filtro ricercabile a selezione multipla per scegliere una o più
+risorse da visualizzare. La selezione appartiene al filtro sopra la tabella e
+non alle singole righe del Calendario.
 
 **Criteri di accettazione**
 
 - la ricerca filtra per nome e, se disponibile, ruolo;
-- le checkbox consentono selezione singola, multipla e “seleziona tutte le
-  persone filtrate”;
+- il menu del filtro consente selezione singola, multipla, selezione dei
+  risultati ricercati e ripristino di tutte le persone;
+- la tabella non mostra checkbox sulle righe e contiene esclusivamente le
+  risorse scelte nel filtro;
 - il filtro resta applicato cambiando settimana, mese o anno;
 - cambiare modalità Staffing/Ferie-Assenze non perde la selezione;
 - se nessuna persona corrisponde viene mostrato uno stato vuoto esplicito;
@@ -190,7 +193,8 @@ Gli item richiesti sono stati implementati nel codice corrente:
 - **WFM-002:** tooltip percentuale/ore nel Calendario, con capacità su 5 giorni
   lavorativi;
 - **WFM-003:** selezione e cancellazione multipla delle Persone;
-- **WFM-004:** ricerca e selezione multipla delle persone nel Calendario;
+- **WFM-004:** filtro ricercabile multiselezione delle persone nel Calendario,
+  senza checkbox sulle righe;
 - **WFM-005:** media allocazione e ore equivalenti per progetto in Dashboard;
 - **WFM-006:** visualizzazione assenze, durata oraria opzionale e blocco
   server-side delle assegnazioni su assenze approvate;
