@@ -82,12 +82,19 @@ export interface Assignment {
 export interface StaffingDay {
   total: number;
   capacityHoursPerWeek: number;
-  items: { projectName: string; projectColor: string; percentage: number }[];
+  items: {
+    projectName: string;
+    commessaId?: string;
+    projectColor: string;
+    percentage: number;
+  }[];
 }
 
 export interface StaffingPersonSnapshot {
   personId: number;
   personName: string;
+  personType: PersonType;
+  role?: string | null;
   capacityHoursPerWeek: number;
   avatarColor: string;
   days: Record<string, StaffingDay>;
@@ -145,7 +152,8 @@ export interface AppUser {
 export interface Settings {
   underutilization_threshold: string;
   overutilization_threshold: string;
-  [key: string]: string;
+  include_contractors_in_productivity?: string;
+  [key: string]: string | undefined;
 }
 
 export type ActivityAction = "created" | "updated" | "deleted";

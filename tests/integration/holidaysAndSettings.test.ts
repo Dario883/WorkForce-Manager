@@ -48,18 +48,34 @@ describe.skipIf(!process.env.TEST_DATABASE_URL)("/api/settings", () => {
     const agent = await adminAgent();
     const res = await agent.get("/api/settings");
     expect(res.status).toBe(200);
-    expect(res.body).toMatchObject({ underutilization_threshold: "70", overutilization_threshold: "100" });
+    expect(res.body).toMatchObject({
+      underutilization_threshold: "70",
+      overutilization_threshold: "100",
+      include_contractors_in_productivity: "true",
+    });
   });
 
   it("upserts thresholds and persists them across requests", async () => {
     const agent = await adminAgent();
     const put = await agent
       .put("/api/settings")
-      .send({ underutilization_threshold: "60", overutilization_threshold: "110" });
+      .send({
+        underutilization_threshold: "60",
+        overutilization_threshold: "110",
+        include_contractors_in_productivity: "false",
+      });
     expect(put.status).toBe(200);
-    expect(put.body).toMatchObject({ underutilization_threshold: "60", overutilization_threshold: "110" });
+    expect(put.body).toMatchObject({
+      underutilization_threshold: "60",
+      overutilization_threshold: "110",
+      include_contractors_in_productivity: "false",
+    });
 
     const get = await agent.get("/api/settings");
-    expect(get.body).toMatchObject({ underutilization_threshold: "60", overutilization_threshold: "110" });
+    expect(get.body).toMatchObject({
+      underutilization_threshold: "60",
+      overutilization_threshold: "110",
+      include_contractors_in_productivity: "false",
+    });
   });
 });

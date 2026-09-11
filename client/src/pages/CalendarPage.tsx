@@ -4,7 +4,8 @@ import type { Absence, AbsenceType, Assignment, Holiday, Project, StaffingPerson
 import { Card, CardBody } from "../components/Card";
 import Button from "../components/Button";
 import Modal from "../components/Modal";
-import { Field, Input, Select } from "../components/ui";
+import { Badge, Field, Input, Select } from "../components/ui";
+import { PERSON_TYPE_COLOR, PERSON_TYPE_LABEL } from "../components/PersonModal";
 import AssignmentModal from "../components/AssignmentModal";
 import AbsenceModal, { ABSENCE_COLOR, ABSENCE_LABEL, ABSENCE_STATUS_LABEL, ABSENCE_TYPES } from "../components/AbsenceModal";
 import {
@@ -288,9 +289,17 @@ export default function CalendarPage() {
   const columns = buildColumns(view, range.start, range.end);
   const todayStr = format(new Date(), "yyyy-MM-dd");
   const allPeople = snapshot?.people ?? [];
-  const matchingPeople = allPeople.filter((person) =>
-    person.personName.toLowerCase().includes(personSearch.trim().toLowerCase())
-  );
+  const matchingPeople = allPeople.filter((person) => {
+    const q = personSearch.trim().toLowerCase();
+    if (!q) return true;
+    const typeLabel = (PERSON_TYPE_LABEL[person.personType] || person.personType || "").toLowerCase();
+    const role = (person.role || "").toLowerCase();
+    return (
+      person.personName.toLowerCase().includes(q) ||
+      typeLabel.includes(q) ||
+      role.includes(q)
+    );
+  });
   const visiblePeople = allPeople.filter((person) => personFilter.size === 0 || personFilter.has(person.personId));
 
   function togglePersonFilter(personId: number) {
@@ -449,9 +458,14 @@ export default function CalendarPage() {
               {matchingPeople.length === 0 ? (
                 <p className="py-3 text-center text-xs text-slate-400">Nessuna persona trovata</p>
               ) : matchingPeople.map((person) => (
-                <label key={person.personId} className="flex cursor-pointer items-center gap-2 rounded px-2 py-1.5 text-sm text-slate-700 hover:bg-slate-50 dark:text-slate-200 dark:hover:bg-slate-700">
-                  <input type="checkbox" checked={personFilter.has(person.personId)} onChange={() => togglePersonFilter(person.personId)} />
-                  <span>{person.personName}</span>
+                <label key={person.personId} className="flex cursor-pointer items-center justify-between rounded px-2 py-1.5 text-sm text-slate-700 hover:bg-slate-50 dark:text-slate-200 dark:hover:bg-slate-700">
+                  <div className="flex items-center gap-2">
+                    <input type="checkbox" checked={personFilter.has(person.personId)} onChange={() => togglePersonFilter(person.personId)} />
+                    <span>{person.personName}</span>
+                  </div>
+                  <Badge color={PERSON_TYPE_COLOR[person.personType] || "#3457d5"}>
+                    {PERSON_TYPE_LABEL[person.personType] || person.personType}
+                  </Badge>
                 </label>
               ))}
             </div>
@@ -520,15 +534,25 @@ export default function CalendarPage() {
                   return (
                     <Fragment key={person.personId}>
                       <tr className="border-b border-slate-50 dark:border-slate-700">
-                        <td className="sticky left-0 z-10 border-r border-slate-100 dark:border-slate-700 bg-white dark:bg-slate-800 px-4 py-2 font-medium text-slate-700 dark:text-slate-200">
-                          <button
-                            className="mr-2 inline-flex h-5 w-5 items-center justify-center rounded border border-slate-200 dark:border-slate-600 text-xs text-slate-500 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-700"
-                            onClick={() => toggleExpand(person.personId)}
-                            title={isExpanded ? "Comprimi" : "Espandi assegnazioni"}
-                          >
-                            {isExpanded ? "−" : "+"}
-                          </button>
-                          {person.personName}
+                        <td
+                          className="sticky left-0 z-10 border-r border-slate-100 dark:border-slate-700 bg-white dark:bg-slate-800 px-4 py-2 font-medium text-slate-700 dark:text-slate-200"
+                          title={`${person.personName} (${PERSON_TYPE_LABEL[person.personType] || person.personType})${person.role ? ` · ${person.role}` : ""}`}
+                        >
+                          <div className="flex items-center justify-between gap-2">
+                            <div className="flex items-center">
+                              <button
+                                className="mr-2 inline-flex h-5 w-5 items-center justify-center rounded border border-slate-200 dark:border-slate-600 text-xs text-slate-500 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-700"
+                                onClick={() => toggleExpand(person.personId)}
+                                title={isExpanded ? "Comprimi" : "Espandi assegnazioni"}
+                              >
+                                {isExpanded ? "−" : "+"}
+                              </button>
+                              <span>{person.personName}</span>
+                            </div>
+                            <Badge color={PERSON_TYPE_COLOR[person.personType] || "#3457d5"}>
+                              {PERSON_TYPE_LABEL[person.personType] || person.personType}
+                            </Badge>
+                          </div>
                         </td>
                         {columns.map((col) => {
                           const cell = snapshotDayForColumn(person, col);
@@ -559,7 +583,7 @@ export default function CalendarPage() {
                                 className={`h-10 w-full rounded-md text-xs font-semibold transition ${blocked ? "cursor-not-allowed bg-slate-100 text-slate-400 dark:bg-slate-700/60 dark:text-slate-500" : "hover:ring-2 hover:ring-brand-300"} ${!blocked ? allocColor(
                                   total
                                 ) : ""} ${isToday ? "ring-1 ring-brand-400" : ""}`}
-                                title={blocked ? (holiday ? `Festività: ${holiday.name}` : "Assenza approvata: censimento bloccato") : `${cell?.items.map((i) => `${i.projectName}: ${i.percentage}%`).join("\n") ?? "Nessuna assegnazione"}\n${pctToHoursLabel(total, person.capacityHoursPerWeek, col.weekend)}`}
+                                title={blocked ? (holiday ? `Festività: ${holiday.name}` : "Assenza approvata: censimento bloccato") : `${cell?.items.map((i) => `${i.projectName}${i.commessaId ? ` (${i.commessaId})` : ""}: ${i.percentage}%`).join("\n") ?? "Nessuna assegnazione"}\n${pctToHoursLabel(total, person.capacityHoursPerWeek, col.weekend)}`}
                               >
                                 {label}
                               </button>
@@ -598,7 +622,7 @@ export default function CalendarPage() {
                                   >
                                     {projects.map((p) => (
                                       <option key={p.id} value={p.id}>
-                                        {p.name}
+                                        {p.name} {p.commessaId ? `(${p.commessaId})` : ""}
                                       </option>
                                     ))}
                                   </select>
@@ -686,8 +710,16 @@ export default function CalendarPage() {
                 {dataMode === "absences" &&
                   visiblePeople.map((person) => (
                     <tr key={person.personId} className="border-b border-slate-50 dark:border-slate-700">
-                      <td className="sticky left-0 z-10 border-r border-slate-100 dark:border-slate-700 bg-white dark:bg-slate-800 px-4 py-2 font-medium text-slate-700 dark:text-slate-200">
-                        {person.personName}
+                      <td
+                        className="sticky left-0 z-10 border-r border-slate-100 dark:border-slate-700 bg-white dark:bg-slate-800 px-4 py-2 font-medium text-slate-700 dark:text-slate-200"
+                        title={`${person.personName} (${PERSON_TYPE_LABEL[person.personType] || person.personType})${person.role ? ` · ${person.role}` : ""}`}
+                      >
+                        <div className="flex items-center justify-between gap-2">
+                          <span>{person.personName}</span>
+                          <Badge color={PERSON_TYPE_COLOR[person.personType] || "#3457d5"}>
+                            {PERSON_TYPE_LABEL[person.personType] || person.personType}
+                          </Badge>
+                        </div>
                       </td>
                       {columns.map((col) => {
                         const match = absenceForColumn(person.personId, col, absences);

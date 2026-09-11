@@ -18,7 +18,7 @@ describe.skipIf(!process.env.TEST_DATABASE_URL)("GET /api/staffing/snapshot", ()
 
   it("sums overlapping assignment percentages per day and reports base capacity", async () => {
     const agent = await adminAgent();
-    const person = await agent.post("/api/people").send({ name: "Mario Rossi", capacityHoursPerWeek: 40 });
+    const person = await agent.post("/api/people").send({ name: "Mario Rossi", type: "consulente", capacityHoursPerWeek: 40 });
     const project = await agent.post("/api/projects").send({ name: "Progetto A", color: "#3987e5" });
 
     await agent.post("/api/assignments").send({
@@ -32,9 +32,14 @@ describe.skipIf(!process.env.TEST_DATABASE_URL)("GET /api/staffing/snapshot", ()
     const snapshot = await agent.get("/api/staffing/snapshot").query({ from: "2026-07-20", to: "2026-07-26" });
     expect(snapshot.status).toBe(200);
     const personSnapshot = snapshot.body.people.find((p: { personId: number }) => p.personId === person.body.id);
+    expect(personSnapshot.personType).toBe("consulente");
     expect(personSnapshot.days["2026-07-22"].total).toBe(60);
     expect(personSnapshot.days["2026-07-22"].capacityHoursPerWeek).toBe(40);
-    expect(personSnapshot.days["2026-07-22"].items[0]).toMatchObject({ projectName: "Progetto A", percentage: 60 });
+    expect(personSnapshot.days["2026-07-22"].items[0]).toMatchObject({
+      projectName: "Progetto A",
+      commessaId: project.body.commessaId,
+      percentage: 60,
+    });
   });
 
   it("returns 0 outside the assignment's date range", async () => {

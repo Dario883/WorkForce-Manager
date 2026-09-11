@@ -10,6 +10,7 @@ export const settingsRouter = Router();
 const DEFAULTS: Record<string, string> = {
   underutilization_threshold: "70", // % below which a person is "under-allocated"
   overutilization_threshold: "100", // % above which a person is "over-allocated"
+  include_contractors_in_productivity: "true", // whether contractors/consulenti count towards monthly team productivity & allocation KPIs
 };
 
 settingsRouter.get("/", asyncHandler(async (_req, res) => {

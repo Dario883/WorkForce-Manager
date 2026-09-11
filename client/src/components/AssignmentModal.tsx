@@ -144,7 +144,7 @@ export default function AssignmentModal({
             </option>
             {projects.map((p) => (
               <option key={p.id} value={p.id}>
-                {p.name}
+                {p.name} {p.commessaId ? `(${p.commessaId})` : ""}
               </option>
             ))}
           </Select>

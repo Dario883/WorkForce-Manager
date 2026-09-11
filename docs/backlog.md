@@ -19,6 +19,9 @@ indicano l'ordine suggerito per la consegna:
 | WFM-005 | Dashboard | Media di produttività per progetto | P1 | Definizione metrica, assegnazioni |
 | WFM-006 | Ferie / Calendario | Sincronizzare assenze e bloccare i giorni approvati | P0 | Workflow assenze, calendario |
 | WFM-007 | Staffing | Filtro per settimana, mese e anno | P1 | Intervallo temporale |
+| WFM-008 | Dashboard / Impostazioni | Inclusione configurabile dei contractor nella produttività mensile | P1 | Impostazioni / Calcolo KPI |
+| WFM-009 | Calendario | Visualizzazione tipo persona nel Calendario | P1 | Snapshot staffing, UI Calendario |
+| WFM-010 | Calendario / Assegnazioni | Visualizzazione codice commessa nella selezione assegnazione | P1 | Progetti, commessaId, UI Calendario / Modal |
 
 ## Item dettagliati
 
@@ -175,6 +178,56 @@ interamente nel periodo.
 - il riepilogo indica periodo e numero di assegnazioni risultanti;
 - il comportamento è coerente tra vista Lista e vista Per persona.
 
+### WFM-008 — Inclusione configurabile dei contractor nella produttività mensile
+
+**Area:** Dashboard / Impostazioni · **Priorità:** P1 · **Tipo:** reporting / configurazione
+
+Consentire all'utente/amministratore di scegliere se le risorse esterne
+(`type = 'consulente'` / contractor) devono concorrere al calcolo della
+produttività e della media di allocazione mensile nella Dashboard (e relativi
+KPI del team: media allocazione, FTE allocati, risorse sotto/sovra-utilizzate).
+
+**Criteri di accettazione**
+
+- presenza di un'opzione di configurazione (in Impostazioni > Soglie o toggle rapido in Dashboard) per includere/escludere i contractor dal calcolo della produttività/allocazione;
+- quando l'opzione esclude i contractor, la media del team, le ore libere, gli FTE e gli elenchi sotto/sovra-allocazione considerano solo i dipendenti/stage;
+- la vista di riepilogo dei progetti continua a mostrare l'allocazione effettiva complessiva sul progetto o evidenzia la quota contractor/dipendenti;
+- lo stato dell'impostazione viene persistito ed è coerente al cambio mese/settimana/anno;
+- calcoli e formule sono coperti da test unitari.
+
+### WFM-009 — Visualizzazione tipo persona nel Calendario
+
+**Area:** Calendario · **Priorità:** P1 · **Tipo:** UX
+
+Nel Calendario, mostrare esplicitamente per ogni risorsa il campo **Tipo**
+definito nell'anagrafica Persone (`Dipendente`, `Consulente`, `Stage`),
+tramite etichetta/badge dedicato o testo affiancato al nome, integrato da
+un tooltip esplicativo (es: *Eustachio Sardone (Dipendente)*, *Claudio Anelli (Consulente)*).
+
+**Criteri di accettazione**
+
+- il tipo persona (`dipendente`, `consulente`, `stage`) è incluso nel payload dello snapshot staffing (`/staffing/snapshot`) e fruibile nel Calendario;
+- nella colonna "Persona" è visibile la tipologia risorsa accanto al nome (es. badge/etichetta o testo formattato);
+- al passaggio del mouse sul nome della persona è disponibile un tooltip esplicito con formato `Nome Cognome (Tipo)` e ruolo;
+- la visualizzazione è attiva sia in modalità Staffing sia in Ferie/Assenze;
+- il filtro di ricerca persone nel Calendario permette la ricerca anche per tipo risorsa.
+
+### WFM-010 — Visualizzazione codice commessa nella selezione assegnazione
+
+**Area:** Calendario / Assegnazioni · **Priorità:** P1 · **Tipo:** UX
+
+Quando si assegna o si modifica un progetto nel Calendario (sia dal menu a
+tendina della riga espansa, sia dal modale di assegnazione rapida /
+AssignmentModal), mostrare chiaramente sia il **nome del progetto** sia il
+relativo **codice commessa** (`commessaId`). Esempio: *Migrazione Cloud (migrazione-cloud-2026-09-04)*.
+
+**Criteri di accettazione**
+
+- nel dropdown di selezione del progetto delle righe assegnazione del Calendario, le opzioni mostrano formato esplicito `[Nome Progetto] (Commessa: [commessaId])`;
+- nel selettore progetto del modale `AssignmentModal`, ogni opzione include sia il nome del progetto sia l'identificativo commessa;
+- nel tooltip informativo delle celle del calendario, accanto al nome progetto è presente anche il codice commessa per disambiguare assegnazioni su progetti simili/omonimi;
+- la selezione continua a salvare correttamente il `projectId` corrispondente senza regressioni.
+
 ## Ordine suggerito di rilascio
 
 1. **P0 — Integrità del calendario:** WFM-001 e WFM-006, includendo i
@@ -185,7 +238,7 @@ interamente nel periodo.
 4. **P1 — Supporto decisionale:** WFM-002, dopo la conferma della formula
    ore/settimana → ore/giorno.
 
-## Stato implementazione — 2026-09-04
+## Stato implementazione — 2026-09-11
 
 Gli item richiesti sono stati implementati nel codice corrente:
 
@@ -198,14 +251,19 @@ Gli item richiesti sono stati implementati nel codice corrente:
 - **WFM-005:** media allocazione e ore equivalenti per progetto in Dashboard;
 - **WFM-006:** visualizzazione assenze, durata oraria opzionale e blocco
   server-side delle assegnazioni su assenze approvate;
-- **WFM-007:** filtro Staffing per tutto/settimana/mese/anno.
+- **WFM-007:** filtro Staffing per tutto/settimana/mese/anno;
+- **WFM-008:** inclusione/esclusione configurabile dei contractor dalla produttività mensile in Dashboard e Impostazioni;
+- **WFM-009:** visualizzazione del tipo persona (badge e tooltip `Nome (Tipo) - Ruolo`) nel Calendario e filtro persone arricchito;
+- **WFM-010:** visualizzazione del codice commessa (`commessaId`) nella selezione progetto per le assegnazioni nel Calendario e nel modale di assegnazione.
 
 Le decisioni aperte sono state risolte così: festività e assenze approvate
 bloccano l'inserimento; “produttività” è rappresentata dalla media di
-allocazione fino a quando non esiste un dato consuntivo; la capacità
-giornaliera usa la settimana lavorativa di 5 giorni; un'assenza oraria è
-ammessa su una singola giornata e, come regola prudenziale, una volta
-approvata blocca l'intera giornata di staffing.
+allocazione fino a quando non esiste un dato consuntivo; l'inclusione dei
+contractor nella produttività mensile è configurabile sia a livello globale
+che tramite switch rapido in Dashboard; la capacità giornaliera usa la
+settimana lavorativa di 5 giorni; un'assenza oraria è ammessa su una singola
+giornata e, come regola prudenziale, una volta approvata blocca l'intera
+giornata di staffing.
 
 ## Decisioni aperte
 

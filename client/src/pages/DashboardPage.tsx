@@ -6,7 +6,7 @@ import { Card, CardBody, CardHeader } from "../components/Card";
 import { Badge } from "../components/ui";
 import Modal from "../components/Modal";
 import DonutChart from "../components/DonutChart";
-import type { Absence, Assignment, DeliveryType, Person, Project, ProjectStatus, Settings, StaffingSnapshot } from "@shared/types";
+import type { Absence, Assignment, DeliveryType, Person, Project, ProjectStatus, Settings, StaffingDay, StaffingPersonSnapshot, StaffingSnapshot } from "@shared/types";
 import { DELIVERY_COLOR, DELIVERY_LABEL } from "../components/ProjectModal";
 import {
   addDays,
@@ -61,6 +61,14 @@ export function getAllocationTone(value: number, underThreshold: number, overThr
   return status === "under" ? "#f59e0b" : status === "over" ? "#ef4444" : "#10b981";
 }
 
+export function filterPeopleForProductivity(
+  peopleList: StaffingPersonSnapshot[],
+  includeContractors: boolean
+): StaffingPersonSnapshot[] {
+  if (includeContractors) return peopleList;
+  return peopleList.filter((p) => p.personType !== "consulente");
+}
+
 export default function DashboardPage() {
   const [view, setView] = useState<PeriodView>("week");
   const [anchor, setAnchor] = useState(new Date());
@@ -71,6 +79,7 @@ export default function DashboardPage() {
   const [periodAssignments, setPeriodAssignments] = useState<Assignment[]>([]);
   const [allAbsences, setAllAbsences] = useState<Absence[]>([]);
   const [settings, setSettings] = useState<Settings | null>(null);
+  const [includeContractors, setIncludeContractors] = useState(true);
   const [loading, setLoading] = useState(true);
   const [allocationExpanded, setAllocationExpanded] = useState(true);
   const [drilldown, setDrilldown] = useState<{
@@ -100,6 +109,9 @@ export default function DashboardPage() {
         setPeople(p);
         setProjects(pr);
         setSettings(s);
+        if (s.include_contractors_in_productivity !== undefined) {
+          setIncludeContractors(s.include_contractors_in_productivity !== "false");
+        }
       }
     );
   }, []);
@@ -132,26 +144,32 @@ export default function DashboardPage() {
   const underThreshold = Number(settings?.underutilization_threshold ?? 70);
   const overThreshold = Number(settings?.overutilization_threshold ?? 100);
 
+  const rawPeople = snapshot?.people ?? [];
+  const productivePeople = filterPeopleForProductivity(rawPeople, includeContractors);
+
   const avgPerPerson =
-    snapshot?.people.map((p) => {
-      const dayValues = Object.values(p.days);
+    productivePeople.map((p) => {
+      const dayValues: StaffingDay[] = Object.values(p.days);
       const avg = dayValues.length ? dayValues.reduce((a, d) => a + d.total, 0) / dayValues.length : 0;
       const avgCapacity = dayValues.length
         ? dayValues.reduce((a, d) => a + d.capacityHoursPerWeek, 0) / dayValues.length
         : p.capacityHoursPerWeek;
       return { ...p, avg, avgCapacity };
-    }) ?? [];
+    });
 
   const underAllocated = avgPerPerson.filter((p) => p.avg < underThreshold);
   const overAllocated = avgPerPerson.filter((p) => p.avg > overThreshold);
   const activeProjects = projects.filter((p) => p.status === "active");
 
   const teamAvg = avgPerPerson.length ? avgPerPerson.reduce((s, p) => s + p.avg, 0) / avgPerPerson.length : 0;
+  
+  const rawPrevPeople = prevSnapshot?.people ?? [];
+  const prevProductivePeople = filterPeopleForProductivity(rawPrevPeople, includeContractors);
   const prevAvgPerPerson =
-    prevSnapshot?.people.map((p) => {
-      const values = Object.values(p.days).map((d) => d.total);
-      return values.length ? values.reduce((a, b) => a + b, 0) / values.length : 0;
-    }) ?? [];
+    prevProductivePeople.map((p) => {
+      const values: StaffingDay[] = Object.values(p.days);
+      return values.length ? values.reduce((a, b) => a + b.total, 0) / values.length : 0;
+    });
   const prevTeamAvg = prevAvgPerPerson.length ? prevAvgPerPerson.reduce((s, v) => s + v, 0) / prevAvgPerPerson.length : 0;
   const teamAvgDelta = teamAvg - prevTeamAvg;
 
@@ -193,7 +211,7 @@ export default function DashboardPage() {
   const projectHoursMap = new Map<string, { color: string; hours: number }>();
   for (const p of avgPerPerson) {
     const dailyRate = p.capacityHoursPerWeek / 7;
-    for (const day of Object.values(p.days)) {
+    for (const day of Object.values(p.days) as StaffingDay[]) {
       for (const item of day.items) {
         const entry = projectHoursMap.get(item.projectName) ?? { color: item.projectColor, hours: 0 };
         entry.hours += dailyRate * (item.percentage / 100);
@@ -212,7 +230,7 @@ export default function DashboardPage() {
 
   const projectAverageMap = new Map<string, { color: string; total: number; samples: number; hours: number }>();
   for (const person of avgPerPerson) {
-    for (const day of Object.values(person.days)) {
+    for (const day of Object.values(person.days) as StaffingDay[]) {
       for (const item of day.items) {
         const entry = projectAverageMap.get(item.projectName) ?? { color: item.projectColor, total: 0, samples: 0, hours: 0 };
         entry.total += item.percentage;
@@ -422,12 +440,21 @@ export default function DashboardPage() {
 
   return (
     <div>
-      <div className="mb-6 flex items-center justify-between">
+      <div className="mb-6 flex flex-wrap items-center justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold text-slate-900 dark:text-slate-100">D-Dashboard</h1>
+          <h1 className="text-2xl font-bold text-slate-900 dark:text-slate-100">Dashboard</h1>
           <p className="text-sm text-slate-500 dark:text-slate-400">{periodLabel}</p>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
+          <label className="flex cursor-pointer select-none items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-50 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-slate-700">
+            <input
+              type="checkbox"
+              checked={includeContractors}
+              onChange={(e) => setIncludeContractors(e.target.checked)}
+              className="rounded text-brand-600 focus:ring-brand-500"
+            />
+            <span>Includi contractor</span>
+          </label>
           <div className="flex rounded-lg border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-800 p-0.5">
             {(["week", "month", "year"] as PeriodView[]).map((m) => (
               <button

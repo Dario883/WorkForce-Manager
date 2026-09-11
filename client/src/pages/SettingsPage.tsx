@@ -21,6 +21,7 @@ export default function SettingsPage() {
   const [settings, setSettings] = useState<Settings | null>(null);
   const [under, setUnder] = useState(70);
   const [over, setOver] = useState(100);
+  const [includeContractors, setIncludeContractors] = useState(true);
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
   const [activeTab, setActiveTab] = useState<"thresholds" | "holidays" | "users" | "activity">("thresholds");
@@ -41,6 +42,7 @@ export default function SettingsPage() {
       setSettings(s);
       setUnder(Number(s.underutilization_threshold));
       setOver(Number(s.overutilization_threshold));
+      setIncludeContractors(s.include_contractors_in_productivity !== "false");
     });
   }, []);
 
@@ -52,6 +54,7 @@ export default function SettingsPage() {
       await api.put("/settings", {
         underutilization_threshold: String(under),
         overutilization_threshold: String(over),
+        include_contractors_in_productivity: includeContractors ? "true" : "false",
       });
       setSaved(true);
     } finally {
@@ -97,9 +100,9 @@ export default function SettingsPage() {
           {activeTab === "thresholds" && (
             <Card className="max-w-lg">
               <CardHeader>
-                <h2 className="font-semibold text-slate-800 dark:text-slate-100">Soglie di allocazione</h2>
+                <h2 className="font-semibold text-slate-800 dark:text-slate-100">Soglie e produttività</h2>
                 <p className="text-xs text-slate-500 dark:text-slate-400">
-                  Usate nella Dashboard per segnalare persone sotto o sovra allocate.
+                  Usate nella Dashboard per calcolare le metriche di produttività e segnalare persone sotto o sovra allocate.
                 </p>
               </CardHeader>
               <CardBody>
@@ -122,6 +125,25 @@ export default function SettingsPage() {
                       onChange={(e) => setOver(Number(e.target.value))}
                     />
                   </Field>
+
+                  <div className="mb-4">
+                    <label className="flex items-start gap-2.5 cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={includeContractors}
+                        onChange={(e) => setIncludeContractors(e.target.checked)}
+                        className="mt-0.5 rounded text-brand-600 focus:ring-brand-500"
+                      />
+                      <div>
+                        <span className="block text-sm font-medium text-slate-700 dark:text-slate-200">
+                          Includi contractor nella produttività mensile
+                        </span>
+                        <span className="block text-xs text-slate-500 dark:text-slate-400">
+                          Se disattivato, i consulenti/contractor vengono esclusi dai KPI aggregati di team (media allocazione, FTE, sotto/sovra-utilizzati).
+                        </span>
+                      </div>
+                    </label>
+                  </div>
 
                   {saved && <p className="mb-3 text-sm text-emerald-600 dark:text-emerald-400">Impostazioni salvate.</p>}
 

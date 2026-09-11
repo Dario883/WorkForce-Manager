@@ -41,7 +41,9 @@ utente vede dipende dai suoi permessi (vedi
 ### 3.1 Dashboard (`/`)
 Vista di sintesi con indicatori aggregati raggruppati in tre cluster ("Team",
 "Progetti", "Ferie"): numero di persone, persone fuori soglia di
-allocazione, allocazione media del team, capacità libera in ore/FTE,
+allocazione, allocazione media del team (con opzione di configurazione e
+filtro rapido per includere o escludere i consulenti/contractor dal calcolo
+della produttività e allocazione mensile di team), capacità libera in ore/FTE,
 progetti attivi/in scadenza/in partenza/senza risorse, giorni di assenza nel
 periodo, richieste in attesa di approvazione. La sezione "Allocazione per
 persona" usa una visualizzazione executive-board a barre orizzontali: ogni
@@ -87,13 +89,19 @@ con stato diverso da `active`. Import/export CSV.
 
 ### 3.6 Calendario (`/calendar`)
 Vista a griglia persona × periodo (settimana/mese/anno), con due modalità:
-- un filtro persone ricercabile e multiselezione permette di mostrare solo
-  una o più risorse specifiche, senza modificare o selezionare le righe;
+- ciascuna persona mostra il badge/etichetta con il **tipo risorsa**
+  (`Dipendente`, `Consulente`, `Stage`) e tooltip descrittivo (`Nome (Tipo) - Ruolo`);
+- un filtro persone ricercabile e multiselezione permette di cercare e
+  mostrare solo una o più risorse specifiche (filtrabili per nome, ruolo o tipo
+  risorsa), senza modificare o selezionare le righe;
 - **Staffing**: percentuale di allocazione per giorno/periodo, colorata in
   base alle soglie (sotto-allocato / 70–100% / sovra-allocato), con editing
   inline (click su una cella per modificare la percentuale di
   un'unità — giorno/settimana/mese/anno — che **divide automaticamente**
   l'assegnazione originale in più righe, vedi [§4.1](#41-allocazione-e-staffing)).
+  Nelle righe espanse di assegnazione e nel modale di censimento rapido, la
+  selezione del progetto riporta esplicitamente sia il nome del progetto sia
+  il codice commessa associato (`commessaId`), presente anche nel tooltip di dettaglio;
 - **Ferie/Assenze**: stessa griglia ma con i tipi di assenza (ferie,
   malattia, permesso, formazione, altro) e le festività aziendali, distinte
   dalle assenze personali.
@@ -110,8 +118,9 @@ Calendario e blocca il censimento staffing della giornata.
 Quattro sotto-sezioni, ciascuna con un proprio permesso indipendente (vedi
 [04-sicurezza.md](04-sicurezza.md#2-autorizzazione-modello-a-permessi)):
 
-- **Soglie**: percentuali di sotto/sovra-allocazione usate per colorare
-  Dashboard, Persone e Calendario.
+- **Soglie e produttività**: percentuali di sotto/sovra-allocazione usate per
+  colorare Dashboard, Persone e Calendario, oltre all'opzione di default per
+  includere o escludere i contractor/consulenti dai KPI di produttività.
 - **Festività**: festività aziendali/nazionali condivise, visibili nel
   Calendario ma distinte dalle assenze personali.
 - **Utenti**: chi può accedere al gestionale, con quali permessi per

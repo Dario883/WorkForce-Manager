@@ -45,6 +45,7 @@ staffingRouter.get("/snapshot", asyncHandler(async (req, res) => {
       personId: assignments.personId,
       projectId: assignments.projectId,
       projectName: projects.name,
+      projectCommessaId: projects.commessaId,
       projectColor: projects.color,
       percentage: assignments.percentage,
       startDate: assignments.startDate,
@@ -64,7 +65,7 @@ staffingRouter.get("/snapshot", asyncHandler(async (req, res) => {
       {
         total: number;
         capacityHoursPerWeek: number;
-        items: { projectName: string; projectColor: string; percentage: number }[];
+        items: { projectName: string; commessaId?: string; projectColor: string; percentage: number }[];
       }
     > = {};
 
@@ -80,6 +81,7 @@ staffingRouter.get("/snapshot", asyncHandler(async (req, res) => {
         capacityHoursPerWeek: resolveCapacity(personCapacityPeriodsForPerson, person.capacityHoursPerWeek, day),
         items: active.map((a) => ({
           projectName: a.projectName,
+          commessaId: a.projectCommessaId,
           projectColor: a.projectColor,
           percentage: a.percentage,
         })),
@@ -89,6 +91,8 @@ staffingRouter.get("/snapshot", asyncHandler(async (req, res) => {
     return {
       personId: person.id,
       personName: person.name,
+      personType: person.type,
+      role: person.role,
       capacityHoursPerWeek: person.capacityHoursPerWeek,
       avatarColor: person.avatarColor,
       days: dayMap,
