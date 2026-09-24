@@ -5,7 +5,16 @@ import { db } from "./db";
 import { users } from "./schema";
 import { eq } from "drizzle-orm";
 
-const JWT_SECRET = process.env.JWT_SECRET || "dev-only-secret-change-me";
+function readJwtSecret() {
+  const configuredSecret = process.env.JWT_SECRET;
+  if (configuredSecret) return configuredSecret;
+  if (process.env.NODE_ENV === "production") {
+    throw new Error("JWT_SECRET must be configured in production");
+  }
+  return "dev-only-secret-change-me";
+}
+
+const JWT_SECRET = readJwtSecret();
 const COOKIE_NAME = "wfm_session";
 const SESSION_DAYS = 7;
 

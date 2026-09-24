@@ -1,4 +1,5 @@
 import { Router } from "express";
+import rateLimit from "express-rate-limit";
 import { z } from "zod";
 import { db } from "../db";
 import { users } from "../schema";
@@ -19,7 +20,20 @@ const loginSchema = z.object({
   password: z.string().min(1),
 });
 
-authRouter.post("/login", asyncHandler(async (req, res) => {
+const loginRateLimit = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  limit:
+    process.env.NODE_ENV !== "production" && Number(process.env.LOGIN_RATE_LIMIT_MAX) > 0
+      ? Number(process.env.LOGIN_RATE_LIMIT_MAX)
+      : process.env.NODE_ENV === "test"
+        ? 1000
+        : 10,
+  standardHeaders: "draft-8",
+  legacyHeaders: false,
+  message: { error: "Troppi tentativi di login. Riprova più tardi." },
+});
+
+authRouter.post("/login", loginRateLimit, asyncHandler(async (req, res) => {
   const parsed = loginSchema.safeParse(req.body);
   if (!parsed.success) {
     return res.status(400).json({ error: "Email o password non validi" });

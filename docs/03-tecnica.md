@@ -21,6 +21,7 @@
 | pg (node-postgres) | 8.12.0 | Driver PostgreSQL |
 | jsonwebtoken | 9.0.2 | Firma/verifica sessioni JWT |
 | bcryptjs | 2.4.3 | Hashing password |
+| express-rate-limit | 8.x | Limitazione dei tentativi di login per IP |
 | zod | 3.23.8 | Validazione input di ogni endpoint |
 | papaparse | 5.4.1 | Parsing/generazione CSV (import/export) |
 | cookie-parser | 1.4.6 | Parsing del cookie di sessione |

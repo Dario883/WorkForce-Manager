@@ -12,14 +12,18 @@ async function seed() {
   }
 
   const email = process.env.SEED_ADMIN_EMAIL || "admin@example.com";
-  const password = process.env.SEED_ADMIN_PASSWORD || "changeme123";
+  const password = process.env.SEED_ADMIN_PASSWORD || (process.env.NODE_ENV === "production" ? "" : "changeme123");
   const name = process.env.SEED_ADMIN_NAME || "Admin";
+
+  if (!password) {
+    throw new Error("SEED_ADMIN_PASSWORD must be configured in production");
+  }
 
   const passwordHash = await hashPassword(password);
   await db.insert(users).values({ email, passwordHash, name });
 
-  console.log(`Utente admin creato: ${email} (password iniziale: ${password})`);
-  console.log("Ricordati di cambiarla al primo accesso.");
+  console.log(`Utente admin creato: ${email}`);
+  console.log("Imposta una nuova password dopo il primo accesso.");
   await pool.end();
 }
 

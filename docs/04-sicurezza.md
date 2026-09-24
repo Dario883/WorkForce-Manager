@@ -10,9 +10,12 @@
   produzione (richiede HTTPS, garantito dal terminamento TLS di Azure App
   Service), durata **7 giorni**.
 - **Password**: hashing con `bcryptjs`, cost factor 10 (default). Nessuna
-  password in chiaro viene mai loggata o restituita dalle API (le query di
-  lettura utenti proiettano esplicitamente solo le colonne necessarie,
-  escludendo `password_hash`).
+  password in chiaro viene restituita dalle API o scritta nei log applicativi
+  (le query di lettura utenti proiettano esplicitamente solo le colonne
+  necessarie, escludendo `password_hash`; il seed stampa solo l'email).
+- **Brute-force**: `POST /api/auth/login` è protetto da `express-rate-limit`:
+  massimo 10 tentativi per IP in 15 minuti in produzione. Il limite può essere
+  sovrascritto con `LOGIN_RATE_LIMIT_MAX` solo per ambienti di test locali.
 - **Verifica continua, non solo al login**: `attachUser` (middleware
   eseguito su ogni richiesta) **ri-legge da database** lo stato `active` e
   `permissions` dell'utente ad ogni singola richiesta, invece di fidarsi
@@ -110,7 +113,8 @@ dell'entità coinvolta.
 | Segreto | Dove vive | Note |
 |---|---|---|
 | `DATABASE_URL` | `.env` locale (gitignored) / variabile d'ambiente Azure App Service | Include `sslmode=require` verso Azure Postgres |
-| `JWT_SECRET` | `.env` locale / variabile d'ambiente Azure App Service | Fallback di sviluppo (`dev-only-secret-change-me`) **solo** se non impostato — da non usare mai in produzione |
+| `JWT_SECRET` | `.env` locale / variabile d'ambiente Azure App Service | Obbligatorio in produzione; se assente l'applicazione non si avvia. Il fallback `dev-only-secret-change-me` è consentito solo fuori produzione |
+| `SEED_ADMIN_PASSWORD` | `.env` locale / variabile d'ambiente Azure App Service | Obbligatorio in produzione per il primo seed; non viene mai stampato nei log |
 | `AZURE_WEBAPP_PUBLISH_PROFILE` | Secret del repository GitHub | Usato solo dal job `build-and-deploy` per il deploy |
 | `TEST_DATABASE_URL` | `.env` locale (solo sviluppo) / `env` del job `test` in CI | Punta **sempre** a un database dedicato e usa-e-getta, mai a quello di produzione (vedi [03-tecnica.md §5](03-tecnica.md#5-testing)) |
 
@@ -123,6 +127,7 @@ documenta le chiavi attese senza valori reali.
 |---|---|
 | XSS → furto del token di sessione | Cookie `httpOnly` (illeggibile da JavaScript) |
 | CSRF | Cookie `sameSite: "lax"` (non inviato in richieste cross-site di tipo "simple") |
+| Brute-force sul login | `express-rate-limit`: 10 tentativi per IP ogni 15 minuti in produzione |
 | SQL injection | Tutte le query passano da Drizzle ORM con parametri bindati; nessuna concatenazione di stringhe SQL nei router applicativi |
 | Password deboli/compromesse | Hashing bcrypt (mai testo in chiaro); nessuna policy di complessità password lato server oltre alla lunghezza minima (8 caratteri, via zod) |
 | Escalation di privilegi tramite l'API permessi | Validazione zod con `z.enum` sulle sole chiavi di permesso valide; guardie anti-self-lockout lato server |
@@ -133,10 +138,6 @@ documenta le chiavi attese senza valori reali.
 Elencati con onestà per chi valuterà il sistema o pianificherà un
 hardening ulteriore:
 
-- **Nessun rate-limiting sul login**: `POST /api/auth/login` non ha
-  protezione contro tentativi ripetuti (brute-force). Mitigazione
-  suggerita: rate-limiting per IP/email (es. `express-rate-limit`) o
-  lockout temporaneo dopo N tentativi falliti.
 - **Nessuna autenticazione a due fattori (2FA)**.
 - **Nessuna rotazione di `JWT_SECRET`**: un secret compromesso invalida
   tutte le sessioni solo se ruotato manualmente (e richiede un redeploy).
