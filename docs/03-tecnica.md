@@ -22,6 +22,7 @@
 | jsonwebtoken | 9.0.2 | Firma/verifica sessioni JWT |
 | bcryptjs | 2.4.3 | Hashing password |
 | express-rate-limit | 8.x | Limitazione dei tentativi di login per IP |
+| otplib | 13.x | Generazione e verifica codici TOTP per MFA |
 | zod | 3.23.8 | Validazione input di ogni endpoint |
 | papaparse | 5.4.1 | Parsing/generazione CSV (import/export) |
 | cookie-parser | 1.4.6 | Parsing del cookie di sessione |
@@ -128,7 +129,7 @@ indicato — vedi [04-sicurezza.md](04-sicurezza.md) per il dettaglio completo.
 
 | Risorsa | Endpoint principali | Permesso (scrittura) |
 |---|---|---|
-| Auth | `POST /auth/login`, `POST /auth/logout`, `GET /auth/me` | pubblico |
+| Auth | `POST /auth/login`, `POST /auth/mfa/verify`, `POST /auth/logout`, `GET /auth/me` | login pubblico; MFA setup/confirm/disable autenticati |
 | Persone | `GET/POST /people`, `GET/PUT/DELETE /people/:id`, `POST /people/bulk-delete`, `GET/POST/DELETE /people/:id/capacity(/:capacityId)`, `GET /people/:id/assignments`, `GET /people/export`, `POST /people/import` | `people` |
 | Progetti | `GET/POST /projects`, `GET/PUT/DELETE /projects/:id`, `GET /projects/export`, `POST /projects/import` | `projects` |
 | Assegnazioni | `GET/POST /assignments`, `PUT/DELETE /assignments/:id`, `POST /assignments/overwrite`, `POST /assignments/:id/split`, `GET /assignments/export`, `POST /assignments/import` | `staffing` |

@@ -11,7 +11,7 @@
     API->>API: bcrypt.compare(password, hash)
     alt credenziali valide
         API->>API: jwt.sign({userId, email, name})
-        API-->>SPA: 200 + Set-Cookie httpOnly (7 giorni)
+        API-->>SPA: 200 + Set-Cookie httpOnly (8 ore)
     else credenziali non valide
         API-->>SPA: 401 Credenziali non valide
     end

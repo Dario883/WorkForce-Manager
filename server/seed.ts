@@ -12,11 +12,11 @@ async function seed() {
   }
 
   const email = process.env.SEED_ADMIN_EMAIL || "admin@example.com";
-  const password = process.env.SEED_ADMIN_PASSWORD || (process.env.NODE_ENV === "production" ? "" : "changeme123");
+  const password = process.env.SEED_ADMIN_PASSWORD || "";
   const name = process.env.SEED_ADMIN_NAME || "Admin";
 
   if (!password) {
-    throw new Error("SEED_ADMIN_PASSWORD must be configured in production");
+    throw new Error("SEED_ADMIN_PASSWORD must be configured before running the seed");
   }
 
   const passwordHash = await hashPassword(password);

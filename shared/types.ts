@@ -145,6 +145,7 @@ export interface AppUser {
   email: string;
   name: string;
   active: boolean;
+  mfaEnabled: boolean;
   permissions: string[] | null;
   createdAt: string;
 }
@@ -156,7 +157,7 @@ export interface Settings {
   [key: string]: string | undefined;
 }
 
-export type ActivityAction = "created" | "updated" | "deleted";
+export type ActivityAction = "created" | "updated" | "deleted" | "login_success" | "login_failed" | "mfa_failed" | "mfa_enabled" | "mfa_disabled";
 
 export interface ActivityLogEntry {
   id: number;

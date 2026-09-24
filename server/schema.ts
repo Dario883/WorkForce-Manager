@@ -61,6 +61,8 @@ export const users = pgTable("users", {
   passwordHash: text("password_hash").notNull(),
   name: varchar("name", { length: 255 }).notNull(),
   active: boolean("active").notNull().default(true),
+  mfaSecretEncrypted: text("mfa_secret_encrypted"),
+  mfaEnabled: boolean("mfa_enabled").notNull().default(false),
   // Tab keys (see shared/types.ts APP_TABS) this user is restricted to.
   // null = unrestricted (full access) — the default, so existing/new users
   // keep working normally until an admin explicitly narrows their access.
@@ -173,6 +175,18 @@ export const activityLog = pgTable("activity_log", {
   entityId: integer("entity_id").notNull(),
   entityName: varchar("entity_name", { length: 255 }).notNull(),
   detail: text("detail"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+// ── Authentication audit (login/MFA events) ─────────────────────────────
+export const authAudit = pgTable("auth_audit", {
+  id: serial("id").primaryKey(),
+  userId: integer("user_id"),
+  email: varchar("email", { length: 255 }).notNull(),
+  event: varchar("event", { length: 32 }).notNull(),
+  reason: varchar("reason", { length: 128 }),
+  ipAddress: varchar("ip_address", { length: 128 }),
+  userAgent: text("user_agent"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 

@@ -1,5 +1,7 @@
 import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
+import { createCipheriv, createDecipheriv, createHash, randomBytes } from "node:crypto";
+import { generateSecret, generateURI, verify } from "otplib";
 import type { Request, Response, NextFunction } from "express";
 import { db } from "./db";
 import { users } from "./schema";
@@ -16,7 +18,26 @@ function readJwtSecret() {
 
 const JWT_SECRET = readJwtSecret();
 const COOKIE_NAME = "wfm_session";
-const SESSION_DAYS = 7;
+const SESSION_HOURS = 8;
+const SESSION_MS = SESSION_HOURS * 60 * 60 * 1000;
+const MFA_CHALLENGE_MINUTES = 5;
+
+const MFA_ENCRYPTION_KEY = createHash("sha256")
+  .update(process.env.MFA_ENCRYPTION_KEY || (process.env.NODE_ENV === "production" ? "" : "dev-only-mfa-key"))
+  .digest();
+
+if (process.env.NODE_ENV === "production" && !process.env.MFA_ENCRYPTION_KEY) {
+  throw new Error("MFA_ENCRYPTION_KEY must be configured in production");
+}
+
+export const PASSWORD_MIN_LENGTH = 12;
+const COMMON_PASSWORDS = new Set(["password", "password123", "changeme123", "123456789012", "qwertyuiop12"]);
+
+export function getPasswordValidationError(password: string) {
+  if (password.length < PASSWORD_MIN_LENGTH) return `La password deve contenere almeno ${PASSWORD_MIN_LENGTH} caratteri`;
+  if (COMMON_PASSWORDS.has(password.toLowerCase())) return "Scegli una password meno comune";
+  return null;
+}
 
 export interface AuthPayload {
   userId: number;
@@ -37,7 +58,7 @@ export async function verifyPassword(password: string, hash: string) {
 }
 
 export function signSession(payload: AuthPayload) {
-  return jwt.sign(payload, JWT_SECRET, { expiresIn: `${SESSION_DAYS}d` });
+  return jwt.sign(payload, JWT_SECRET, { expiresIn: `${SESSION_HOURS}h` });
 }
 
 export function verifySession(token: string): AuthPayload | null {
@@ -53,9 +74,50 @@ export function setSessionCookie(res: Response, token: string) {
     httpOnly: true,
     sameSite: "lax",
     secure: process.env.NODE_ENV === "production",
-    maxAge: SESSION_DAYS * 24 * 60 * 60 * 1000,
+    maxAge: SESSION_MS,
     path: "/",
   });
+}
+
+export function signMfaChallenge(payload: AuthPayload) {
+  return jwt.sign({ ...payload, purpose: "mfa" }, JWT_SECRET, { expiresIn: `${MFA_CHALLENGE_MINUTES}m` });
+}
+
+export function verifyMfaChallenge(token: string): AuthPayload | null {
+  try {
+    const payload = jwt.verify(token, JWT_SECRET) as AuthPayload & { purpose?: string };
+    return payload.purpose === "mfa" ? payload : null;
+  } catch {
+    return null;
+  }
+}
+
+function encryptMfaSecret(secret: string) {
+  const iv = randomBytes(12);
+  const cipher = createCipheriv("aes-256-gcm", MFA_ENCRYPTION_KEY, iv);
+  const encrypted = Buffer.concat([cipher.update(secret, "utf8"), cipher.final()]);
+  return [iv.toString("base64url"), cipher.getAuthTag().toString("base64url"), encrypted.toString("base64url")].join(".");
+}
+
+export function decryptMfaSecret(value: string) {
+  try {
+    const [ivValue, tagValue, encryptedValue] = value.split(".");
+    const decipher = createDecipheriv("aes-256-gcm", MFA_ENCRYPTION_KEY, Buffer.from(ivValue, "base64url"));
+    decipher.setAuthTag(Buffer.from(tagValue, "base64url"));
+    return Buffer.concat([decipher.update(Buffer.from(encryptedValue, "base64url")), decipher.final()]).toString("utf8");
+  } catch {
+    return null;
+  }
+}
+
+export function createMfaSetup(email: string) {
+  const secret = generateSecret();
+  return { secret, uri: generateURI({ issuer: "WorkForce Manager", label: email, secret }), encryptedSecret: encryptMfaSecret(secret) };
+}
+
+export async function verifyMfaCode(secret: string, token: string) {
+  const result = await verify({ secret, token });
+  return result.valid;
 }
 
 export function clearSessionCookie(res: Response) {

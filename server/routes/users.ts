@@ -4,7 +4,7 @@ import { db } from "../db";
 import { users } from "../schema";
 import { eq } from "drizzle-orm";
 import { asyncHandler } from "../asyncHandler";
-import { hashPassword } from "../auth";
+import { getPasswordValidationError, hashPassword, PASSWORD_MIN_LENGTH } from "../auth";
 import { logActivity } from "../activityLog";
 import { ALL_PERMISSION_KEYS } from "@shared/types";
 
@@ -15,6 +15,7 @@ const USER_COLUMNS = {
   email: users.email,
   name: users.name,
   active: users.active,
+  mfaEnabled: users.mfaEnabled,
   permissions: users.permissions,
   createdAt: users.createdAt,
 };
@@ -26,10 +27,14 @@ usersRouter.get("/", asyncHandler(async (_req, res) => {
   res.json(rows);
 }));
 
+const passwordSchema = z.string().refine((value) => !getPasswordValidationError(value), {
+  message: `La password deve contenere almeno ${PASSWORD_MIN_LENGTH} caratteri e non essere comune`,
+});
+
 const createSchema = z.object({
   email: z.string().email(),
   name: z.string().min(1),
-  password: z.string().min(8),
+  password: passwordSchema,
 });
 
 usersRouter.post("/", asyncHandler(async (req, res) => {
@@ -51,7 +56,7 @@ usersRouter.post("/", asyncHandler(async (req, res) => {
 const updateSchema = z.object({
   name: z.string().min(1).optional(),
   active: z.boolean().optional(),
-  password: z.string().min(8).optional(),
+  password: passwordSchema.optional(),
   permissions: z.array(z.enum(TAB_KEYS)).nullable().optional(),
 });
 

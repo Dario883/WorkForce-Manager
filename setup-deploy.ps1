@@ -143,6 +143,7 @@ $pgDbName = "workforce_manager"
 $pgAdminUser = "wfmadmin"
 $pgAdminPassword = "Wfm!" + (New-RandomToken 18)
 $jwtSecret = New-RandomToken 32
+$mfaEncryptionKey = New-RandomToken 32
 $seedAdminEmail = "admin@$safeBase.local"
 $seedAdminPassword = "Adm!" + (New-RandomToken 12)
 $seedAdminName = "Admin"
@@ -236,6 +237,7 @@ Write-Step "Applying Azure Web App environment variables"
 $appSettings = @(
     "DATABASE_URL=$databaseUrl",
     "JWT_SECRET=$jwtSecret",
+    "MFA_ENCRYPTION_KEY=$mfaEncryptionKey",
     "NODE_ENV=production"
 )
 Run-OrFail { & $AzExe webapp config appsettings set --name $appName --resource-group $resourceGroup --settings $appSettings --output none } "Failed setting app settings"

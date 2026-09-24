@@ -2,6 +2,10 @@ import { describe, expect, it, vi } from "vitest";
 import type { Request, Response } from "express";
 import {
   hashPassword,
+  createMfaSetup,
+  decryptMfaSecret,
+  getPasswordValidationError,
+  verifyMfaCode,
   verifyPassword,
   signSession,
   verifySession,
@@ -10,6 +14,7 @@ import {
   requireAuth,
   type RequestUser,
 } from "../../server/auth";
+import { generate } from "otplib";
 
 function fakeReq(overrides: Partial<Request> & { user?: RequestUser } = {}): Request {
   return { method: "GET", ...overrides } as unknown as Request;
@@ -28,6 +33,21 @@ describe("hashPassword / verifyPassword", () => {
     expect(hash).not.toBe("Sup3rSecret!");
     await expect(verifyPassword("Sup3rSecret!", hash)).resolves.toBe(true);
     await expect(verifyPassword("wrong-password", hash)).resolves.toBe(false);
+  });
+});
+
+describe("password policy and MFA", () => {
+  it("rejects short and common passwords", () => {
+    expect(getPasswordValidationError("short")).toBeTruthy();
+    expect(getPasswordValidationError("changeme123")).toBeTruthy();
+    expect(getPasswordValidationError("A much safer password 2026!")).toBeNull();
+  });
+
+  it("encrypts an MFA secret and verifies a generated TOTP code", async () => {
+    const setup = createMfaSetup("admin@example.com");
+    expect(decryptMfaSecret(setup.encryptedSecret)).toBe(setup.secret);
+    const token = await generate({ secret: setup.secret });
+    await expect(verifyMfaCode(setup.secret, token)).resolves.toBe(true);
   });
 });
 

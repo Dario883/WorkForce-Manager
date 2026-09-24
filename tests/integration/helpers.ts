@@ -5,6 +5,7 @@ import { users } from "../../server/schema";
 import { hashPassword } from "../../server/auth";
 
 const TABLES = [
+  "auth_audit",
   "activity_log",
   "absences",
   "assignments",

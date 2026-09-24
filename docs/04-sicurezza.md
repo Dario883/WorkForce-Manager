@@ -8,7 +8,8 @@
   client, mitigando il furto del token via XSS.
 - **Cookie**: `httpOnly: true`, `sameSite: "lax"`, `secure: true` in
   produzione (richiede HTTPS, garantito dal terminamento TLS di Azure App
-  Service), durata **7 giorni**.
+  Service), durata **8 ore**. Il client esegue inoltre il logout dopo **30
+  minuti di inattività**.
 - **Password**: hashing con `bcryptjs`, cost factor 10 (default). Nessuna
   password in chiaro viene restituita dalle API o scritta nei log applicativi
   (le query di lettura utenti proiettano esplicitamente solo le colonne
@@ -16,12 +17,15 @@
 - **Brute-force**: `POST /api/auth/login` è protetto da `express-rate-limit`:
   massimo 10 tentativi per IP in 15 minuti in produzione. Il limite può essere
   sovrascritto con `LOGIN_RATE_LIMIT_MAX` solo per ambienti di test locali.
+- **MFA amministratori**: gli utenti con accesso completo (`permissions ===
+  null`) possono attivare TOTP. Il secret è cifrato con AES-256-GCM usando
+  `MFA_ENCRYPTION_KEY`; il login richiede una challenge MFA valida 5 minuti.
 - **Verifica continua, non solo al login**: `attachUser` (middleware
   eseguito su ogni richiesta) **ri-legge da database** lo stato `active` e
   `permissions` dell'utente ad ogni singola richiesta, invece di fidarsi
   solo del contenuto del JWT. Conseguenza pratica: disattivare un utente o
   restringergli i permessi ha effetto **immediato**, senza dover attendere
-  la scadenza del token (7 giorni) né implementare una blacklist di token
+  la scadenza del token (8 ore) né implementare una blacklist di token
   revocati.
 
 ## 2. Autorizzazione: modello a permessi
@@ -114,7 +118,8 @@ dell'entità coinvolta.
 |---|---|---|
 | `DATABASE_URL` | `.env` locale (gitignored) / variabile d'ambiente Azure App Service | Include `sslmode=require` verso Azure Postgres |
 | `JWT_SECRET` | `.env` locale / variabile d'ambiente Azure App Service | Obbligatorio in produzione; se assente l'applicazione non si avvia. Il fallback `dev-only-secret-change-me` è consentito solo fuori produzione |
-| `SEED_ADMIN_PASSWORD` | `.env` locale / variabile d'ambiente Azure App Service | Obbligatorio in produzione per il primo seed; non viene mai stampato nei log |
+| `MFA_ENCRYPTION_KEY` | `.env` locale / variabile d'ambiente Azure App Service | Obbligatorio in produzione se si abilita MFA; protegge i secret TOTP cifrati |
+| `SEED_ADMIN_PASSWORD` | `.env` locale / variabile d'ambiente Azure App Service | Obbligatorio per il seed; non viene mai stampato nei log |
 | `AZURE_WEBAPP_PUBLISH_PROFILE` | Secret del repository GitHub | Usato solo dal job `build-and-deploy` per il deploy |
 | `TEST_DATABASE_URL` | `.env` locale (solo sviluppo) / `env` del job `test` in CI | Punta **sempre** a un database dedicato e usa-e-getta, mai a quello di produzione (vedi [03-tecnica.md §5](03-tecnica.md#5-testing)) |
 
@@ -128,8 +133,10 @@ documenta le chiavi attese senza valori reali.
 | XSS → furto del token di sessione | Cookie `httpOnly` (illeggibile da JavaScript) |
 | CSRF | Cookie `sameSite: "lax"` (non inviato in richieste cross-site di tipo "simple") |
 | Brute-force sul login | `express-rate-limit`: 10 tentativi per IP ogni 15 minuti in produzione |
+| Sessioni lasciate aperte | JWT 8 ore + logout client dopo 30 minuti di inattività |
+| Compromissione credenziali amministratore | MFA TOTP opzionale per amministratori, con challenge separata dal login password |
 | SQL injection | Tutte le query passano da Drizzle ORM con parametri bindati; nessuna concatenazione di stringhe SQL nei router applicativi |
-| Password deboli/compromesse | Hashing bcrypt (mai testo in chiaro); nessuna policy di complessità password lato server oltre alla lunghezza minima (8 caratteri, via zod) |
+| Password deboli/compromesse | Hashing bcrypt (mai testo in chiaro); minimo 12 caratteri e rifiuto di password comuni |
 | Escalation di privilegi tramite l'API permessi | Validazione zod con `z.enum` sulle sole chiavi di permesso valide; guardie anti-self-lockout lato server |
 | Path traversal / accesso a risorse altrui | Ogni endpoint filtra sempre per `id` numerico validato; non esistono percorsi che espongano file arbitrari lato server oltre ai file statici della build SPA |
 
@@ -138,7 +145,6 @@ documenta le chiavi attese senza valori reali.
 Elencati con onestà per chi valuterà il sistema o pianificherà un
 hardening ulteriore:
 
-- **Nessuna autenticazione a due fattori (2FA)**.
 - **Nessuna rotazione di `JWT_SECRET`**: un secret compromesso invalida
   tutte le sessioni solo se ruotato manualmente (e richiede un redeploy).
 - **`USERS` e `PEOPLE` non sono collegate** (vedi

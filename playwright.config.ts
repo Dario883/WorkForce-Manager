@@ -26,6 +26,7 @@ export default defineConfig({
       PORT: String(PORT),
       DATABASE_URL: process.env.TEST_DATABASE_URL || "",
       JWT_SECRET: process.env.JWT_SECRET || "e2e-test-secret",
+      MFA_ENCRYPTION_KEY: process.env.MFA_ENCRYPTION_KEY || "e2e-mfa-encryption-key",
     },
   },
   projects: [{ name: "chromium", use: { ...devices["Desktop Chrome"] } }],

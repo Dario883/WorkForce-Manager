@@ -168,12 +168,22 @@ const ACTION_LABEL: Record<string, string> = {
   created: "Creato",
   updated: "Modificato",
   deleted: "Eliminato",
+  login_success: "Login riuscito",
+  login_failed: "Login fallito",
+  mfa_failed: "MFA fallito",
+  mfa_enabled: "MFA attivato",
+  mfa_disabled: "MFA disattivato",
 };
 
 const ACTION_COLOR: Record<string, string> = {
   created: "#059669",
   updated: "#0891b2",
   deleted: "#dc2626",
+  login_success: "#059669",
+  login_failed: "#dc2626",
+  mfa_failed: "#dc2626",
+  mfa_enabled: "#7c3aed",
+  mfa_disabled: "#64748b",
 };
 
 type ActivitySortKey = "createdAt" | "userName" | "action" | "entityType" | "entityName";
@@ -581,12 +591,18 @@ function EditUserModal({
   const [permissions, setPermissions] = useState<string[] | null>(null);
   const [password, setPassword] = useState("");
   const [saving, setSaving] = useState(false);
+  const [mfaSetup, setMfaSetup] = useState<{ secret: string; uri: string } | null>(null);
+  const [mfaCode, setMfaCode] = useState("");
+  const [mfaPassword, setMfaPassword] = useState("");
 
   useEffect(() => {
     if (user) {
       setName(user.name);
       setPermissions(user.permissions);
       setPassword("");
+      setMfaSetup(null);
+      setMfaCode("");
+      setMfaPassword("");
     }
   }, [user]);
 
@@ -595,6 +611,32 @@ function EditUserModal({
   const allTabs = ALL_PERMISSION_KEYS.map((t) => t.key);
   const hasFullAccess = permissions === null;
   const isSettingsChecked = hasFullAccess || (permissions?.includes("settings") ?? false);
+
+  async function setupMfa() {
+    try {
+      setMfaSetup(await api.post<{ secret: string; uri: string }>("/auth/mfa/setup"));
+    } catch (err) {
+      alert(err instanceof ApiError ? err.message : "Errore durante la configurazione MFA.");
+    }
+  }
+
+  async function confirmMfa() {
+    try {
+      await api.post("/auth/mfa/confirm", { code: mfaCode });
+      onSaved();
+    } catch (err) {
+      alert(err instanceof ApiError ? err.message : "Codice MFA non valido.");
+    }
+  }
+
+  async function disableMfa() {
+    try {
+      await api.post("/auth/mfa/disable", { password: mfaPassword, code: mfaCode });
+      onSaved();
+    } catch (err) {
+      alert(err instanceof ApiError ? err.message : "Errore durante la disattivazione MFA.");
+    }
+  }
 
   function toggleTab(key: string) {
     setPermissions((prev) => {
@@ -626,8 +668,42 @@ function EditUserModal({
           <Input required value={name} onChange={(e) => setName(e.target.value)} />
         </Field>
         <Field label="Nuova password (lascia vuoto per non modificarla)">
-          <Input type="password" minLength={8} value={password} onChange={(e) => setPassword(e.target.value)} />
+          <Input type="password" minLength={12} value={password} onChange={(e) => setPassword(e.target.value)} />
         </Field>
+
+        {isSelf && user.permissions === null && (
+          <div className="mt-4 rounded-lg border border-slate-200 p-3 dark:border-slate-600">
+            <div className="flex items-center justify-between">
+              <span className="text-sm font-medium text-slate-700 dark:text-slate-200">MFA amministratore</span>
+              <Badge color={user.mfaEnabled ? "#059669" : "#64748b"}>{user.mfaEnabled ? "Attivo" : "Non attivo"}</Badge>
+            </div>
+            {!user.mfaEnabled && !mfaSetup && (
+              <Button type="button" variant="secondary" className="mt-3" onClick={setupMfa}>Genera configurazione MFA</Button>
+            )}
+            {!user.mfaEnabled && mfaSetup && (
+              <div className="mt-3 space-y-2 text-xs text-slate-600 dark:text-slate-300">
+                <p>Inserisci questo URI nell'app autenticatrice:</p>
+                <p className="break-all rounded bg-slate-50 p-2 font-mono dark:bg-slate-700">{mfaSetup.uri}</p>
+                <p>Secret manuale: <span className="font-mono">{mfaSetup.secret}</span></p>
+                <Field label="Codice generato dall'app">
+                  <Input inputMode="numeric" pattern="[0-9]{6}" value={mfaCode} onChange={(e) => setMfaCode(e.target.value)} />
+                </Field>
+                <Button type="button" onClick={confirmMfa}>Conferma attivazione MFA</Button>
+              </div>
+            )}
+            {user.mfaEnabled && (
+              <div className="mt-3 space-y-2">
+                <Field label="Password attuale">
+                  <Input type="password" value={mfaPassword} onChange={(e) => setMfaPassword(e.target.value)} />
+                </Field>
+                <Field label="Codice MFA attuale">
+                  <Input inputMode="numeric" pattern="[0-9]{6}" value={mfaCode} onChange={(e) => setMfaCode(e.target.value)} />
+                </Field>
+                <Button type="button" variant="secondary" onClick={disableMfa}>Disattiva MFA</Button>
+              </div>
+            )}
+          </div>
+        )}
 
         <div className="mt-4">
           <div className="mb-2 flex items-center justify-between">
@@ -752,7 +828,7 @@ function NewUserModal({ open, onClose, onSaved }: { open: boolean; onClose: () =
           <Input
             type="password"
             required
-            minLength={8}
+            minLength={12}
             value={password}
             onChange={(e) => setPassword(e.target.value)}
           />

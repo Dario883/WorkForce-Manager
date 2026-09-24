@@ -6,12 +6,14 @@ import Button from "../components/Button";
 import { Field, Input } from "../components/ui";
 
 export default function LoginPage() {
-  const { login, user } = useAuth();
+  const { login, verifyMfa, user } = useAuth();
   const [, navigate] = useLocation();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  const [challengeToken, setChallengeToken] = useState<string | null>(null);
+  const [mfaCode, setMfaCode] = useState("");
 
   if (user) {
     navigate("/");
@@ -23,10 +25,26 @@ export default function LoginPage() {
     setError(null);
     setLoading(true);
     try {
-      await login(email, password);
-      navigate("/");
+      const result = await login(email, password);
+      if (result.mfaRequired) setChallengeToken(result.challengeToken);
+      else navigate("/");
     } catch (err) {
       setError(err instanceof ApiError ? err.message : "Errore di accesso");
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function handleMfaSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    if (!challengeToken) return;
+    setError(null);
+    setLoading(true);
+    try {
+      await verifyMfa(challengeToken, mfaCode);
+      navigate("/");
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : "Errore di verifica MFA");
     } finally {
       setLoading(false);
     }
@@ -43,7 +61,13 @@ export default function LoginPage() {
           <p className="text-sm text-slate-500 dark:text-slate-400">Accedi al tuo account</p>
         </div>
 
-        <form onSubmit={handleSubmit}>
+        {challengeToken ? <form onSubmit={handleMfaSubmit}>
+          <Field label="Codice MFA">
+            <Input type="text" inputMode="numeric" pattern="[0-9]{6}" required value={mfaCode} onChange={(e) => setMfaCode(e.target.value)} autoFocus />
+          </Field>
+          {error && <p className="mb-3 text-sm text-red-600 dark:text-red-400">{error}</p>}
+          <Button type="submit" className="w-full" disabled={loading}>{loading ? "Verifica in corso…" : "Verifica codice"}</Button>
+        </form> : <form onSubmit={handleSubmit}>
           <Field label="Email">
             <Input
               type="email"
@@ -68,7 +92,7 @@ export default function LoginPage() {
           <Button type="submit" className="w-full" disabled={loading}>
             {loading ? "Accesso in corso…" : "Accedi"}
           </Button>
-        </form>
+        </form>}
       </div>
     </div>
   );

@@ -22,7 +22,7 @@ describe.skipIf(!process.env.TEST_DATABASE_URL)("/api/users", () => {
     const agent = await adminAgent();
     const res = await agent
       .post("/api/users")
-      .send({ email: "new@test.local", name: "New Person", password: "Password1!" });
+      .send({ email: "new@test.local", name: "New Person", password: "Password1!Long" });
     expect(res.status).toBe(201);
     expect(res.body.permissions).toBeNull();
     expect(res.body.active).toBe(true);
@@ -30,8 +30,8 @@ describe.skipIf(!process.env.TEST_DATABASE_URL)("/api/users", () => {
 
   it("rejects creating a user with a duplicate email", async () => {
     const agent = await adminAgent();
-    await agent.post("/api/users").send({ email: "dup@test.local", name: "A", password: "Password1!" });
-    const res = await agent.post("/api/users").send({ email: "dup@test.local", name: "B", password: "Password1!" });
+    await agent.post("/api/users").send({ email: "dup@test.local", name: "A", password: "Password1!Long" });
+    const res = await agent.post("/api/users").send({ email: "dup@test.local", name: "B", password: "Password1!Long" });
     expect(res.status).toBe(409);
   });
 
@@ -39,7 +39,7 @@ describe.skipIf(!process.env.TEST_DATABASE_URL)("/api/users", () => {
     const agent = await adminAgent();
     const created = await agent
       .post("/api/users")
-      .send({ email: "u@test.local", name: "U", password: "Password1!" });
+      .send({ email: "u@test.local", name: "U", password: "Password1!Long" });
     const res = await agent
       .put(`/api/users/${created.body.id}`)
       .send({ permissions: ["not-a-real-tab"] });
@@ -50,7 +50,7 @@ describe.skipIf(!process.env.TEST_DATABASE_URL)("/api/users", () => {
     const agent = await adminAgent();
     const created = await agent
       .post("/api/users")
-      .send({ email: "u@test.local", name: "U", password: "Password1!" });
+      .send({ email: "u@test.local", name: "U", password: "Password1!Long" });
     const res = await agent
       .put(`/api/users/${created.body.id}`)
       .send({ permissions: ["dashboard", "people"] });
@@ -88,7 +88,7 @@ describe.skipIf(!process.env.TEST_DATABASE_URL)("/api/users", () => {
     const agent = await adminAgent();
     const created = await agent
       .post("/api/users")
-      .send({ email: "disposable@test.local", name: "Disposable", password: "Password1!" });
+      .send({ email: "disposable@test.local", name: "Disposable", password: "Password1!Long" });
     const del = await agent.delete(`/api/users/${created.body.id}`);
     expect(del.status).toBe(204);
     const list = await agent.get("/api/users");
