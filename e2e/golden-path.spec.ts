@@ -1,12 +1,8 @@
 import { test, expect } from "@playwright/test";
-import { E2E_ADMIN_EMAIL, E2E_ADMIN_PASSWORD } from "./global-setup";
+import { loginAsAdmin } from "./auth";
 
 test.beforeEach(async ({ page }) => {
-  await page.goto("/login");
-  await page.locator('input[type="email"]').fill(E2E_ADMIN_EMAIL);
-  await page.locator('input[type="password"]').fill(E2E_ADMIN_PASSWORD);
-  await page.locator('button[type="submit"]').click();
-  await expect(page).toHaveURL("/");
+  await loginAsAdmin(page);
 });
 
 test("creates a person, sees it in the list, then deletes it", async ({ page }) => {

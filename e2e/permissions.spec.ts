@@ -1,13 +1,5 @@
 import { test, expect } from "@playwright/test";
-import { E2E_ADMIN_EMAIL, E2E_ADMIN_PASSWORD } from "./global-setup";
-
-async function loginAsAdmin(page: import("@playwright/test").Page) {
-  await page.goto("/login");
-  await page.locator('input[type="email"]').fill(E2E_ADMIN_EMAIL);
-  await page.locator('input[type="password"]').fill(E2E_ADMIN_PASSWORD);
-  await page.locator('button[type="submit"]').click();
-  await expect(page).toHaveURL("/");
-}
+import { loginAsAdmin } from "./auth";
 
 test("a user restricted to Dashboard only sees Dashboard in the nav and is blocked elsewhere", async ({ page }) => {
   const email = `e2e-restricted-${Date.now()}@test.local`;
