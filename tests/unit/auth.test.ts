@@ -9,6 +9,8 @@ import {
   verifyPassword,
   signSession,
   verifySession,
+  signMfaSetupChallenge,
+  verifyMfaSetupChallenge,
   requireTab,
   requireTabWrite,
   requireAuth,
@@ -60,6 +62,16 @@ describe("signSession / verifySession", () => {
 
   it("rejects a tampered/invalid token", () => {
     expect(verifySession("not-a-real-token")).toBeNull();
+  });
+});
+
+describe("MFA setup challenge", () => {
+  it("accepts setup tokens only for the enrollment flow", () => {
+    const payload = { userId: 1, email: "admin@example.com", name: "Admin" };
+    const token = signMfaSetupChallenge(payload);
+    expect(verifyMfaSetupChallenge(token)).toMatchObject(payload);
+    expect(verifyMfaSetupChallenge(signSession(payload))).toBeNull();
+    expect(verifyMfaSetupChallenge("invalid-token")).toBeNull();
   });
 });
 

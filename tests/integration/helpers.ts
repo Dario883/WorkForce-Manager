@@ -3,6 +3,7 @@ import app from "../../server/app";
 import { db, pool } from "../../server/db";
 import { users } from "../../server/schema";
 import { hashPassword } from "../../server/auth";
+import { generate } from "otplib";
 
 const TABLES = [
   "auth_audit",
@@ -64,6 +65,16 @@ export async function loginAgent(email: string, password = DEFAULT_TEST_PASSWORD
   const res = await agent.post("/api/auth/login").send({ email, password });
   if (res.status !== 200) {
     throw new Error(`Login failed for ${email}: ${res.status} ${JSON.stringify(res.body)}`);
+  }
+  if (res.body.mfaSetupRequired) {
+    const setup = await agent.post("/api/auth/mfa/enroll/setup").send({ setupToken: res.body.setupToken });
+    const code = await generate({ secret: setup.body.secret });
+    const confirmed = await agent.post("/api/auth/mfa/enroll/confirm").send({ setupToken: res.body.setupToken, code });
+    if (setup.status !== 200 || confirmed.status !== 200) {
+      throw new Error(`MFA enrollment failed for ${email}: ${setup.status}/${confirmed.status}`);
+    }
+  } else if (res.body.mfaRequired) {
+    throw new Error(`Login for ${email} requires pre-configured MFA`);
   }
   return agent;
 }

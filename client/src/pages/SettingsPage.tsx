@@ -632,7 +632,7 @@ function EditUserModal({
   async function disableMfa() {
     try {
       await api.post("/auth/mfa/disable", { password: mfaPassword, code: mfaCode });
-      onSaved();
+      window.location.assign("/login");
     } catch (err) {
       alert(err instanceof ApiError ? err.message : "Errore durante la disattivazione MFA.");
     }

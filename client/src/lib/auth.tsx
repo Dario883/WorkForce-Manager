@@ -5,8 +5,13 @@ import type { AuthUser } from "@shared/types";
 interface AuthContextValue {
   user: AuthUser | null;
   loading: boolean;
-  login: (email: string, password: string) => Promise<{ mfaRequired: false } | { mfaRequired: true; challengeToken: string }>;
+  login: (email: string, password: string) => Promise<
+    | { mfaRequired: false }
+    | { mfaRequired: true; challengeToken: string }
+    | { mfaSetupRequired: true; setupToken: string }
+  >;
   verifyMfa: (challengeToken: string, code: string) => Promise<void>;
+  completeMfaEnrollment: (setupToken: string, code: string) => Promise<void>;
   logout: () => Promise<void>;
   can: (tab: string) => boolean;
 }
@@ -49,11 +54,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const result = await api.post<
       | { id: number; email: string; name: string; permissions: string[] | null }
       | { mfaRequired: true; challengeToken: string }
+      | { mfaSetupRequired: true; setupToken: string }
     >(
       "/auth/login",
       { email, password }
     );
-    if ("mfaRequired" in result) return result;
+    if ("mfaRequired" in result || "mfaSetupRequired" in result) return result;
     const loggedUser = result;
     setUser({
       userId: loggedUser.id,
@@ -77,6 +83,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     });
   }
 
+  async function completeMfaEnrollment(setupToken: string, code: string) {
+    const loggedUser = await api.post<{ id: number; email: string; name: string; permissions: string[] | null }>(
+      "/auth/mfa/enroll/confirm",
+      { setupToken, code }
+    );
+    setUser({
+      userId: loggedUser.id,
+      email: loggedUser.email,
+      name: loggedUser.name,
+      permissions: loggedUser.permissions,
+    });
+  }
+
   async function logout() {
     await api.post("/auth/logout");
     setUser(null);
@@ -87,7 +106,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }
 
   return (
-    <AuthContext.Provider value={{ user, loading, login, verifyMfa, logout, can }}>{children}</AuthContext.Provider>
+    <AuthContext.Provider value={{ user, loading, login, verifyMfa, completeMfaEnrollment, logout, can }}>{children}</AuthContext.Provider>
   );
 }
 

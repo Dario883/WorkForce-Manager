@@ -16,8 +16,9 @@
 | Tecnologia | Versione | Ruolo |
 |---|---|---|
 | Express | 4.19.2 | Server HTTP / routing REST |
-| Drizzle ORM | 0.31.x | Query builder tipizzato + migrazioni SQL |
-| Drizzle Kit | 0.22.8 | Generazione/applicazione migrazioni (`drizzle-kit generate` / `migrate`) |
+| Drizzle ORM | 0.45.x | Query builder tipizzato + migrazioni SQL |
+| Drizzle Kit | 0.31.x | Generazione/applicazione migrazioni (`drizzle-kit generate` / `migrate`) |
+| Helmet | 8.x | Header HTTP di sicurezza |
 | pg (node-postgres) | 8.12.0 | Driver PostgreSQL |
 | jsonwebtoken | 9.0.2 | Firma/verifica sessioni JWT |
 | bcryptjs | 2.4.3 | Hashing password |
@@ -35,8 +36,8 @@
 ### Test
 | Tecnologia | Versione | Ruolo |
 |---|---|---|
-| Vitest | 4.1.10 | Unit e integration test |
-| @vitest/coverage-v8 | 4.1.10 | Coverage (provider v8), report `lcov` consumato da SonarQube |
+| Vitest | 4.1.11 | Unit e integration test |
+| @vitest/coverage-v8 | 4.1.11 | Coverage (provider v8), report `lcov` consumato da SonarQube |
 | Supertest | 7.2.2 | Richieste HTTP contro l'app Express nei test di integrazione |
 | Playwright (`@playwright/test`) | 1.62.x | Test end-to-end su browser reale (Chromium) |
 

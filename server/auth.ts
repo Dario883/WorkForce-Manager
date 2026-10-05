@@ -21,6 +21,7 @@ const COOKIE_NAME = "wfm_session";
 const SESSION_HOURS = 8;
 const SESSION_MS = SESSION_HOURS * 60 * 60 * 1000;
 const MFA_CHALLENGE_MINUTES = 5;
+const MFA_SETUP_MINUTES = 10;
 
 const MFA_ENCRYPTION_KEY = createHash("sha256")
   .update(process.env.MFA_ENCRYPTION_KEY || (process.env.NODE_ENV === "production" ? "" : "dev-only-mfa-key"))
@@ -92,6 +93,19 @@ export function verifyMfaChallenge(token: string): AuthPayload | null {
   }
 }
 
+export function signMfaSetupChallenge(payload: AuthPayload) {
+  return jwt.sign({ ...payload, purpose: "mfa_setup" }, JWT_SECRET, { expiresIn: `${MFA_SETUP_MINUTES}m` });
+}
+
+export function verifyMfaSetupChallenge(token: string): AuthPayload | null {
+  try {
+    const payload = jwt.verify(token, JWT_SECRET) as AuthPayload & { purpose?: string };
+    return payload.purpose === "mfa_setup" ? payload : null;
+  } catch {
+    return null;
+  }
+}
+
 function encryptMfaSecret(secret: string) {
   const iv = randomBytes(12);
   const cipher = createCipheriv("aes-256-gcm", MFA_ENCRYPTION_KEY, iv);
@@ -141,19 +155,18 @@ export function readSessionFromRequest(req: Request): AuthPayload | null {
 
 /**
  * Attaches req.user if a valid session cookie is present; does not block the
- * request. Re-checks the user is still active on every request (rather than
- * trusting the JWT alone) so deactivating a user takes effect immediately
- * instead of waiting out the token's remaining lifetime.
+ * request. Re-checks the user's active and MFA status on every request
+ * rather than trusting the JWT alone.
  */
 export async function attachUser(req: Request, _res: Response, next: NextFunction) {
   const session = readSessionFromRequest(req);
   if (session) {
     const [row] = await db
-      .select({ active: users.active, permissions: users.permissions })
+      .select({ active: users.active, mfaEnabled: users.mfaEnabled, permissions: users.permissions })
       .from(users)
       .where(eq(users.id, session.userId))
       .limit(1);
-    if (row?.active) req.user = { ...session, permissions: row.permissions ?? null };
+    if (row?.active && row.mfaEnabled) req.user = { ...session, permissions: row.permissions ?? null };
   }
   next();
 }

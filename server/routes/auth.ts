@@ -8,8 +8,10 @@ import {
   createMfaSetup,
   decryptMfaSecret,
   signMfaChallenge,
+  signMfaSetupChallenge,
   verifyPassword,
   verifyMfaChallenge,
+  verifyMfaSetupChallenge,
   verifyMfaCode,
   signSession,
   setSessionCookie,
@@ -53,6 +55,10 @@ authRouter.post("/login", loginRateLimit, asyncHandler(async (req, res) => {
     await logAuthEvent(req, email, "login_failed", { reason: "unknown_email" });
     return res.status(401).json({ error: "Credenziali non valide" });
   }
+  if (!user.active) {
+    await logAuthEvent(req, email, "login_failed", { userId: user.id, reason: "inactive_user" });
+    return res.status(401).json({ error: "Credenziali non valide" });
+  }
   const valid = await verifyPassword(password, user.passwordHash);
   if (!valid) {
     await logAuthEvent(req, email, "login_failed", { userId: user.id, reason: "wrong_password" });
@@ -60,7 +66,11 @@ authRouter.post("/login", loginRateLimit, asyncHandler(async (req, res) => {
   }
 
   const payload = { userId: user.id, email: user.email, name: user.name };
-  if (user.mfaEnabled && user.permissions === null) {
+  if (!user.mfaEnabled) {
+    await logAuthEvent(req, email, "login_success", { userId: user.id, reason: "mfa_setup_required" });
+    return res.json({ mfaSetupRequired: true, setupToken: signMfaSetupChallenge(payload) });
+  }
+  if (user.mfaEnabled) {
     await logAuthEvent(req, email, "login_success", { userId: user.id, reason: "mfa_required" });
     return res.json({ mfaRequired: true, challengeToken: signMfaChallenge(payload) });
   }
@@ -71,6 +81,43 @@ authRouter.post("/login", loginRateLimit, asyncHandler(async (req, res) => {
   res.json({ id: user.id, email: user.email, name: user.name, permissions: user.permissions ?? null });
 }));
 
+authRouter.post("/mfa/enroll/setup", loginRateLimit, asyncHandler(async (req, res) => {
+  const parsed = z.object({ setupToken: z.string().min(1) }).safeParse(req.body);
+  if (!parsed.success) return res.status(400).json({ error: "Sessione di configurazione MFA non valida" });
+  const challenge = verifyMfaSetupChallenge(parsed.data.setupToken);
+  if (!challenge) return res.status(401).json({ error: "Sessione di configurazione MFA scaduta" });
+
+  const [user] = await db.select().from(users).where(eq(users.id, challenge.userId)).limit(1);
+  if (!user?.active || user.mfaEnabled) {
+    return res.status(401).json({ error: "Sessione di configurazione MFA non valida" });
+  }
+
+  const setup = createMfaSetup(user.email);
+  await db.update(users).set({ mfaSecretEncrypted: setup.encryptedSecret }).where(eq(users.id, user.id));
+  res.json({ secret: setup.secret, uri: setup.uri });
+}));
+
+authRouter.post("/mfa/enroll/confirm", loginRateLimit, asyncHandler(async (req, res) => {
+  const parsed = z.object({ setupToken: z.string().min(1), code: mfaCodeSchema }).safeParse(req.body);
+  if (!parsed.success) return res.status(400).json({ error: "Codice MFA non valido" });
+  const challenge = verifyMfaSetupChallenge(parsed.data.setupToken);
+  if (!challenge) return res.status(401).json({ error: "Sessione di configurazione MFA scaduta" });
+
+  const [user] = await db.select().from(users).where(eq(users.id, challenge.userId)).limit(1);
+  const secret = user?.active && !user.mfaEnabled && user.mfaSecretEncrypted
+    ? decryptMfaSecret(user.mfaSecretEncrypted)
+    : null;
+  if (!user || !secret || !(await verifyMfaCode(secret, parsed.data.code))) {
+    await logAuthEvent(req, challenge.email, "mfa_failed", { userId: challenge.userId, reason: "invalid_setup_code" });
+    return res.status(401).json({ error: "Codice MFA non valido" });
+  }
+
+  await db.update(users).set({ mfaEnabled: true }).where(eq(users.id, user.id));
+  setSessionCookie(res, signSession({ userId: user.id, email: user.email, name: user.name }));
+  await logAuthEvent(req, user.email, "mfa_enabled", { userId: user.id });
+  res.json({ id: user.id, email: user.email, name: user.name, permissions: user.permissions });
+}));
+
 authRouter.post("/mfa/verify", loginRateLimit, asyncHandler(async (req, res) => {
   const parsed = z.object({ challengeToken: z.string().min(1), code: mfaCodeSchema }).safeParse(req.body);
   if (!parsed.success) return res.status(400).json({ error: "Codice MFA non valido" });
@@ -78,7 +125,7 @@ authRouter.post("/mfa/verify", loginRateLimit, asyncHandler(async (req, res) => 
   if (!challenge) return res.status(401).json({ error: "Sessione MFA scaduta" });
 
   const [user] = await db.select().from(users).where(eq(users.id, challenge.userId)).limit(1);
-  const secret = user?.mfaEnabled && user.permissions === null && user.mfaSecretEncrypted
+  const secret = user?.active && user.mfaEnabled && user.mfaSecretEncrypted
     ? decryptMfaSecret(user.mfaSecretEncrypted)
     : null;
   if (!user || !secret || !(await verifyMfaCode(secret, parsed.data.code))) {
@@ -124,6 +171,7 @@ authRouter.post("/mfa/disable", requireAuth, asyncHandler(async (req, res) => {
   }
   await db.update(users).set({ mfaSecretEncrypted: null, mfaEnabled: false }).where(eq(users.id, user.id));
   await logAuthEvent(req, user.email, "mfa_disabled", { userId: user.id });
+  clearSessionCookie(res);
   res.json({ ok: true });
 }));
 

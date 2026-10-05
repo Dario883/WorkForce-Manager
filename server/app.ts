@@ -1,4 +1,5 @@
 import express from "express";
+import helmet from "helmet";
 import type { NextFunction, Request, Response } from "express";
 import cookieParser from "cookie-parser";
 import path from "path";
@@ -20,6 +21,8 @@ import { adminRouter } from "./routes/admin";
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const app = express();
 
+if (process.env.NODE_ENV === "production") app.set("trust proxy", 1);
+app.use(helmet());
 app.use(express.json());
 app.use(cookieParser());
 app.use(asyncHandler(attachUser));

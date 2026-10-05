@@ -23,9 +23,10 @@
     "cookie-parser": "^1.4.6",
     "date-fns": "^3.6.0",
     "dotenv": "^16.4.5",
-    "drizzle-orm": "^0.31.2",
+    "drizzle-orm": "^0.45.3",
     "express": "^4.19.2",
     "express-rate-limit": "^8.7.0",
+    "helmet": "^8.3.0",
     "jsonwebtoken": "^9.0.2",
     "otplib": "^13.5.0",
     "papaparse": "^5.4.1",
@@ -50,10 +51,10 @@
     "@types/react-dom": "^18.3.0",
     "@types/supertest": "^7.2.1",
     "@vitejs/plugin-react": "^4.3.1",
-    "@vitest/coverage-v8": "4.1.10",
+    "@vitest/coverage-v8": "^4.1.11",
     "autoprefixer": "^10.4.19",
     "cross-env": "^10.1.0",
-    "drizzle-kit": "^0.22.8",
+    "drizzle-kit": "^0.31.11",
     "esbuild": "^0.23.0",
     "postcss": "^8.4.39",
     "supertest": "^7.2.2",
@@ -61,6 +62,9 @@
     "tsx": "^4.16.2",
     "typescript": "^5.5.3",
     "vite": "^5.3.4",
-    "vitest": "^4.1.10"
+    "vitest": "^4.1.11"
+  },
+  "overrides": {
+    "qs": "^6.16.0"
   }
 }

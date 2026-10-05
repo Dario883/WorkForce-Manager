@@ -18,14 +18,23 @@ describe.skipIf(!process.env.TEST_DATABASE_URL)("/api/users", () => {
     expect(res.body[0]).toMatchObject({ email: "admin@test.local", permissions: null });
   });
 
-  it("creates a user, defaulting permissions to null (full access)", async () => {
+  it("creates a user with dashboard-only permissions by default", async () => {
     const agent = await adminAgent();
     const res = await agent
       .post("/api/users")
       .send({ email: "new@test.local", name: "New Person", password: "Password1!Long" });
     expect(res.status).toBe(201);
-    expect(res.body.permissions).toBeNull();
+    expect(res.body.permissions).toEqual(["dashboard"]);
     expect(res.body.active).toBe(true);
+  });
+
+  it("does not grant full administrative access to an account without MFA", async () => {
+    const agent = await adminAgent();
+    const created = await agent
+      .post("/api/users")
+      .send({ email: "new@test.local", name: "New Person", password: "Password1!Long" });
+    const res = await agent.put(`/api/users/${created.body.id}`).send({ permissions: null });
+    expect(res.status).toBe(400);
   });
 
   it("rejects creating a user with a duplicate email", async () => {

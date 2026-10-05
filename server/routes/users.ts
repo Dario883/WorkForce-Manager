@@ -47,7 +47,7 @@ usersRouter.post("/", asyncHandler(async (req, res) => {
   const passwordHash = await hashPassword(parsed.data.password);
   const [created] = await db
     .insert(users)
-    .values({ email: parsed.data.email, name: parsed.data.name, passwordHash })
+    .values({ email: parsed.data.email, name: parsed.data.name, passwordHash, permissions: ["dashboard"] })
     .returning(USER_COLUMNS);
   await logActivity(req.user!, "created", "utente", created.id, created.name);
   res.status(201).json(created);
@@ -75,6 +75,13 @@ usersRouter.put("/:id", asyncHandler(async (req, res) => {
     (!parsed.data.permissions.includes("settings") || !parsed.data.permissions.includes("settings:users"))
   ) {
     return res.status(400).json({ error: "Non puoi rimuovere il tuo stesso accesso a Impostazioni > Utenti" });
+  }
+
+  if (parsed.data.permissions === null) {
+    const [target] = await db.select({ mfaEnabled: users.mfaEnabled }).from(users).where(eq(users.id, id)).limit(1);
+    if (target && !target.mfaEnabled) {
+      return res.status(400).json({ error: "L'utente deve attivare MFA prima di ricevere accesso amministrativo" });
+    }
   }
 
   const { password, ...rest } = parsed.data;
