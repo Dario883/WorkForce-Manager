@@ -45,6 +45,9 @@
 - **GitHub Actions** — due workflow indipendenti: `deploy.yml` (job `test` →
   `build-and-deploy`) e `sonar.yml` (analisi SonarQube, non collegato al
   deploy)
+- **npm peer dependencies** — `.npmrc` abilita `legacy-peer-deps` perché
+  Vitest 4 supporta Vite 6+ come peer opzionale, mentre il progetto mantiene
+  Vite 5; `npm ci` deve usare la stessa risoluzione del lockfile.
 - **SonarQube** — analisi statica + coverage, eseguita manualmente
   (`workflow_dispatch`) o ogni notte (schedule); quality gate configurato sul
   progetto lato SonarQube
