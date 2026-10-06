@@ -1,5 +1,5 @@
 import { test, expect } from "@playwright/test";
-import { loginAsAdmin } from "./auth";
+import { completeMfaEnrollment, loginAsAdmin } from "./auth";
 
 test("a user restricted to Dashboard only sees Dashboard in the nav and is blocked elsewhere", async ({ page }) => {
   const email = `e2e-restricted-${Date.now()}@test.local`;
@@ -27,6 +27,7 @@ test("a user restricted to Dashboard only sees Dashboard in the nav and is block
   await page.locator('input[type="email"]').fill(email);
   await page.locator('input[type="password"]').fill(password);
   await page.locator('button[type="submit"]').click();
+  await completeMfaEnrollment(page);
   await expect(page).toHaveURL("/");
 
   const nav = page.locator("nav").first();
