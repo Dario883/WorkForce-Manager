@@ -58,7 +58,10 @@ app.use(
 app.use("/api/admin", adminRouter);
 app.use("/api/activity", requireAuth, requireTab("settings"), requireTab("settings:activity"), activityRouter);
 
-if (process.env.NODE_ENV === "production") {
+if (
+  process.env.NODE_ENV === "production" ||
+  (process.env.NODE_ENV === "test" && process.env.TEST_SERVE_STATIC === "true")
+) {
   const publicDir = path.join(__dirname, "public");
   app.use(express.static(publicDir));
   app.get("*", (_req, res) => {

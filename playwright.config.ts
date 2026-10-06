@@ -22,7 +22,8 @@ export default defineConfig({
     reuseExistingServer: false,
     timeout: 120_000,
     env: {
-      NODE_ENV: "production",
+      NODE_ENV: "test",
+      TEST_SERVE_STATIC: "true",
       PORT: String(PORT),
       DATABASE_URL: process.env.TEST_DATABASE_URL || "",
       JWT_SECRET: process.env.JWT_SECRET || "e2e-test-secret",

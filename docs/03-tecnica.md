@@ -45,6 +45,9 @@
 - **GitHub Actions** — due workflow indipendenti: `deploy.yml` (job `test` →
   `build-and-deploy`) e `sonar.yml` (analisi SonarQube, non collegato al
   deploy)
+- **E2E** — Playwright avvia il bundle statico in `NODE_ENV=test` con
+  `TEST_SERVE_STATIC=true`, mantenendo il limite login di test e senza
+  disattivare il rate limit production.
 - **npm peer dependencies** — `.npmrc` abilita `legacy-peer-deps` perché
   Vitest 4 supporta Vite 6+ come peer opzionale, mentre il progetto mantiene
   Vite 5; `npm ci` deve usare la stessa risoluzione del lockfile.
