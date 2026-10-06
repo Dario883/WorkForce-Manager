@@ -17,10 +17,9 @@ test("a user restricted to Dashboard only sees Dashboard in the nav and is block
   await expect(page.getByText(email)).toBeVisible();
 
   await page.locator(`tr:has-text("${email}")`).getByRole("button", { name: "Modifica" }).click();
-  await page.getByRole("button", { name: "Personalizza" }).click();
-  await page.locator('label:has-text("Dashboard")').locator('input[type=checkbox]').check();
-  await page.getByRole("button", { name: /salva modifiche/i }).click();
-  await expect(page.locator("h2", { hasText: "Modifica utente" })).not.toBeVisible();
+  await expect(page.locator('label:has-text("Dashboard")').locator('input[type=checkbox]')).toBeChecked();
+  await expect(page.getByRole("button", { name: "Concedi tutte" })).toBeVisible();
+  await page.getByRole("button", { name: "Annulla" }).click();
 
   await page.getByRole("button", { name: "Esci" }).click();
 
